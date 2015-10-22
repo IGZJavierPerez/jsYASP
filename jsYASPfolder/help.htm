@@ -1,0 +1,1187 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<!-- Created from PDF via Acrobat SaveAsXML -->
+<!-- Mapping table version: 28-February-2003 -->
+<HTML>
+<HEAD>
+<META
+ name="DC.Title"
+ content="Microsoft Word - help.doc" >
+<META
+ name="DC.Contributor"
+ content="llribas" >
+<META
+ name="DC.Creator"
+ content="PScript5.dll Version 5.2" >
+<META
+ name="DC.Date"
+ content="2005-04-18T17:39:25+02:00" >
+<META
+ name="DC.Date.Modified"
+ content="2005-04-18T17:40:43+02:00" >
+</HEAD>
+<BODY bgcolor=white text=black link=blue vlink=purple alink=fushia >
+<P 
+ align="justify"
+><FONT size="+1" color="#000000"></B>Extracto de la memoria del proyecto de fin de carrera: </P
+><DIV class="Part" 
+
+><H1 
+ align="center"
+><FONT size="+2"><B>jsYASP: Simulador de un procesador docente (Version 1.0) </H1
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">por David Rodr&iacute;guez </P
+><DIV class="Sect" 
+
+><H2 
+ align="justify"
+><FONT size="+2"><B>1 Descripci&oacute;n del YASP </H2
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">Un ordenador esta formado por una serie de elementos, que permiten recibir informaci&oacute;n, procesarla y emitir unos resultados. Como elementos principales podemos destacar: </P
+><P 
+ align="justify"
+><I>Unidad central de proceso</I>. Formada por la <I>unidad de control</I>, que coordina las actividades del ordenador, ejecutando programas de forma ordenada e interactuando con las unidades de entrada y salida, y la <I>unidad aritm&eacute;tico-l&oacute;gica (ALU)</I> que se encarga de todas las operaciones aritm&eacute;ticas y l&oacute;gicas. </P
+><P 
+ align="justify"
+><I>Memoria principal. </I>Es la parte del ordenador que almacena los programas y los datos necesarios para el correcto funcionamiento del programa que se esta ejecutando. </P
+><P 
+ align="justify"
+><I>Perif&eacute;ricos</I>. Elementos dedicados a la recepci&oacute;n y env&iacute;o de datos. </P
+><P 
+ align="justify"
+>Aunque la mayor&iacute;a de ordenadores actuales est&aacute;n basados en el modelo de Von Neumann, el comportamiento de los microprocesadores de hoy d&iacute;a es bastante m&aacute;s complejo. YASP implementa un procesador elemental, y a pesar de tener una funcionalidad bastante limitada nos permite entender el funcionamiento de los ordenadores actuales. </P
+><DIV class="Sect" 
+
+><H3 
+ align="justify"
+><FONT size="+1"><B>1.1 Descripci&oacute;n de la m&aacute;quina elemental </H3
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">YASP implementa la unidad central de proceso (UCP), descompuesta en una unidad de control (UC) y una unidad aritmeticol&oacute;gica (UAL), y la memoria principal. Para completar la estructura b&aacute;sica de un ordenador, solo faltar&iacute;a conectar los perif&eacute;ricos. </P
+><P 
+ align="justify"
+>Esta m&aacute;quina trabaja con datos de 8 bits (1 <I>byte</I>), que bien pueden estar almacenados en la memoria principal o provenir de un puerto de entrada. </P
+><P 
+ align="justify"
+>La memoria principal esta formada por 256 <I>bytes</I>, por lo tanto se pueden representar todas las posiciones con un &uacute;nico byte (desde la 0 hasta la 255). </P
+><P 
+ align="justify"
+>Se dispone de un registro de 8 bits llamado acumulador, que permite procesar los datos, de forma que el resultado de cualquier operaci&oacute;n aritm&eacute;tica o l&oacute;gica se guarda en este registro. </P
+><P 
+ align="justify"
+>Todas estas operaciones se llevan a cabo en la unidad aritmeticol&oacute;gica, que en el caso de necesitar un segundo operando, lo toma de la memoria principal a trav&eacute;s del BM (<I>buffer</I> de memoria). Se dispone de dos <I>flags</I> adicionales, de un bit cada uno, que nos permiten saber si el resultado de la operaci&oacute;n ha sido cero o no (el bit Z) y si la operaci&oacute;n ha generado acarreo o no (el bit C). </P
+><P 
+ align="justify"
+>Para acceder a cualquier posici&oacute;n de memoria, es necesario dejar la direcci&oacute;n en el registro de direcciones de memoria (RAM) antes de efectuar la lectura del contenido de memoria o escribir el contenido del BM. </P
+><P 
+ align="justify"
+>Existen cuatro formas de obtener la direcci&oacute;n del segundo operando de una operaci&oacute;n binaria (el otro es el registro A): </P
+><P 
+ align="justify"
+><I>Inmediata. </I>El valor del operando se especifica conjuntamente con la operaci&oacute;n. </P
+><P 
+ align="justify"
+><I>Directa. </I>La direcci&oacute;n del operando se indica con la operaci&oacute;n. Para obtener el valor es necesario buscar en la posici&oacute;n indicada. </P
+><P 
+ align="justify"
+><I>Indirecta. </I>La direcci&oacute;n que indica la operaci&oacute;n nos dice donde esta guardada la direcci&oacute;n del operando. Es decir, nos dice la direcci&oacute;n donde esta guardada la direcci&oacute;n del operando. </P
+><P 
+ align="justify"
+><I>Indexada. </I> Este modo de direccionamiento esta indicado para los casos en los que se desea trabajar con una serie de datos de los que se conoce la direcci&oacute;n inicial. Para obtener la direcci&oacute;n del operando hay que sumar el contenido del registro X a la direcci&oacute;n que viene con la operaci&oacute;n. </P
+><P 
+ align="justify"
+>Una vez obtenido el segundo operando, en las operaciones que lo requieran, la UAL realiza la operaci&oacute;n entre el operando y el contenido del registro A. El resultado se deja normalmente en el registro A. Si la operaci&oacute;n es unaria, el operando es el registro A y el resultado, igual que pasa con las operaciones binarias se guarda en el registro A. </P
+><P 
+ align="justify"
+>La UAL de YASP puede ejecutar sumas, restas, c&aacute;lculo del opuesto (cambios de signo), incrementos, decrementos, AND l&oacute;gica, OR inclusivas y exclusivas, desplazamientos y rotaciones. Tambi&eacute;n permite el paso directo de informaci&oacute;n  sin realizar ninguna operaci&oacute;n. </P
+><P 
+ align="justify"
+>Tanto las operaciones que realiza la UAL como la direcci&oacute;n que se necesita para obtener un segundo posible operando, se indican en la  instrucci&oacute;n que se esta ejecutando en ese mismo momento. </P
+><P 
+ align="justify"
+>Esta instrucci&oacute;n se guarda en el registro de instrucciones (RI), as&iacute; la unidad de control puede decidir que hacer en cada momento. El ciclo que ejecuta la unidad de control esta formado por estos pasos: </P
+><P 
+ align="justify"
+><I>B&uacute;squeda de la instrucci&oacute;n siguiente. </I> La direcci&oacute;n de la siguiente instrucci&oacute;n se guarda en el contador de programa (CP). Por lo tanto la UC se encarga de obtener el contenido de la posici&oacute;n de memoria indicada en el CP. </P
+><P 
+ align="justify"
+><I>C&aacute;lculo de la direcci&oacute;n efectiva. </I>En el caso de que la instrucci&oacute;n  implique hacer una operaci&oacute;n con dos operandos, hay que leer el <I>byte</I> siguiente de la memoria. Dependiendo del modo de direccionamiento, este <I>byte </I>indica el segundo operando (direccionamiento inmediato) o la direcci&oacute;n necesaria para obtenerlo dependiendo del modo de direccionamiento indicado en la instrucci&oacute;n. </P
+><P 
+ align="justify"
+><I>Ejecuci&oacute;n. </I>En esta fase, la unidad de control dirige a los elementos de la m&aacute;quina para llevar a cabo la operaci&oacute;n indicada en la instrucci&oacute;n. </P
+><P 
+ align="justify"
+><I>C&aacute;lculo de la instrucci&oacute;n siguiente. </I>Generalmente, la siguiente instrucci&oacute;n se encuentra a continuaci&oacute;n de la que queremos ejecutar, por lo que hay suficiente con incrementar el CP. En algunas ocasiones, puede ser necesario saltar a un determinado punto del programa, por lo que se deben utilizar saltos incondicionales o condicionales. Los saltos condicionales, dependen del estado de la m&aacute;quina, y est&aacute;n definidos por los bits C i Z. En este tipo de saltos, solo se puede saltar 16 posiciones hacia delante o 15 hacia atr&aacute;s. Estas instrucciones utilizan un modo de direccionamiento relativo, por lo que la direcci&oacute;n efectiva se obtiene de sumar la direcci&oacute;n que acompa&ntilde;a a la instrucci&oacute;n y el contenido del CP. El disponer de 5 bits para indicar esta direcci&oacute;n, limita el rango de salto a 16 posiciones hacia delante o 15 hacia atr&aacute;s. </P
+></DIV
+><DIV class="Sect" 
+
+><H3 
+ align="justify"
+><FONT size="+1"><B>1.2 El lenguaje m&aacute;quina </H3
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">Las operaciones que puede realizar YASP tienen un c&oacute;digo asociado, el c&oacute;digo de operaci&oacute;n, que la unidad de control entiende. </P
+><P 
+ align="justify"
+>Para facilitar la interpretaci&oacute;n de estos c&oacute;digos se utiliza un mnem&oacute;nico que ayudan a recordar lo que hace un determinado c&oacute;digo. </P
+><P 
+ align="justify"
+>Una instrucci&oacute;n esta formada por un c&oacute;digo de operaci&oacute;n y los posibles argumentos que necesite para que se pueda llevar a cabo su funci&oacute;n. En el caso de la suma es necesario indicar el modo de direccionamiento para encontrar el segundo operando y la direcci&oacute;n que se utilizar&aacute; para calcular la direcci&oacute;n efectiva. </P
+><P 
+ align="justify"
+>Por lo tanto, a la secuencia de instrucciones se las denomina lenguaje m&aacute;quina, porque est&aacute;n escritas en un lenguaje que la m&aacute;quina puede entender. </P
+><P 
+ align="justify"
+>A continuaci&oacute;n se describe el repertorio de instrucciones del YASP agrupadas por su funci&oacute;n. Para simplificar se utiliza <I>arg</I> para indicar el argumento que acompa&ntilde;a al c&oacute;digo de operaci&oacute;n. </P
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+><FONT size="+1"><B>1.2.1 Movimiento de la informaci&oacute;n </H4
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">Estas instrucciones transfieren la informaci&oacute;n entre diferentes elementos de la m&aacute;quina sin modificar su valor. </P
+><P 
+ align="justify"
+>LDA <I>arg </I>El operando de deja en el registro A o X<FONT size="+1" color="#000000"></B>. 
+LDX <I>ar</I><I>g
+</I></P
+><P 
+ align="justify"
+>STA <I>ar</I><I>g	</I>Se guarda el registro A o X en la direcci&oacute;n de memoria efectiva </P
+><P 
+ align="justify"
+>STX <I>ar</I><I>g 	</I>indicada por el operando. Esta instrucci&oacute;n no dispone de direccionamiento inmediato, porque no se puede guardar un valor en otro valor. </P
+><P 
+ align="justify"
+>TAX La instrucci&oacute;n TAX transfiere el contenido del registro A al X, y TXA TXA hace lo contrario. </P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+><FONT size="+1"><B>1.2.2 Operaciones aritm&eacute;ticas </H4
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">Estas instrucciones afectan al bit de <I>carry</I> (C) y <I>zero</I> (Z), que guardan el estado de la operaci&oacute;n hecha. </P
+><P 
+ align="justify"
+>ADD <I>ar</I><I>g	</I>La instrucci&oacute;n ADD suma el operando al registro A, en cambio la </P
+><P 
+ align="justify"
+>SUB <I>ar</I><I>g	</I>instrucci&oacute;n SUB resta de A en valor del operando. Hay que tener en cuenta que SUB hace una suma con el C2 (operando). El resultado de las dos instrucciones se guarda en el registro A. </P
+><P 
+ align="justify"
+>CMP <I>ar</I><I>g	</I>Efect&uacute;a una resta, pero no deja el resultado en el acumulador. Esta instrucci&oacute;n solo sirve para modificar el estado de la m&aacute;quina. </P
+><P 
+ align="justify"
+>NEG 	Calcula el complemento a dos del acumulador y deja el resultado. </P
+><P 
+ align="justify"
+>INA Incrementa y decrementa el acumulador en una unidad. Hay que tener DCA en cuenta que 0-1=255, con C=1; y que 255+1=0, con C=1. </P
+><P 
+ align="justify"
+>INX Incrementa o decrementa el registro X en una unidad. 
+DCX 
+</P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+><FONT size="+1"><B>1.2.3 Operaciones l&oacute;gicas </H4
+><P 
+
+><FONT size="+1"></font></B><FONT size="+1">Estas instrucciones afectan al bit de <I>zero</I> (Z), que podr&aacute; ser consultado m&aacute;s tarde. </P
+><TABLE 
+ align="center" border=0 cellspacing=0 cellpadding=2
+><TR  
+
+><TD  
+ align="center" width="92"  valign="top" height="18" 
+>AND <I>arg </I></TD
+><TD  
+ align="left" width="477"  valign="top" height="18" 
+>Realizan la operaci&oacute;n indicada bit a bit entre el acumulador y el </TD
+></TR
+><TR  
+
+><TD  
+ align="center" width="92"  valign="top" height="18" 
+>OR <I>arg </I></TD
+><TD  
+ align="left" width="477"  valign="top" height="18" 
+>operando. El resultado se guarda en el acumulador. </TD
+></TR
+><TR  
+
+><TD  
+ align="center" width="92"  valign="top" height="28" 
+>XOR <I>arg </I></TD
+><TD  
+ width="477"  valign="top" height="28" 
+></TD></TR
+><TR  
+
+><TD  
+ align="center" width="92"  valign="middle" height="28" 
+>TST <I>arg </I></TD
+><TD  
+ align="left" width="477"  valign="middle" height="28" 
+>Realiza una AND pero no guarda el resultado en el acumulador. Sirve </TD
+></TR
+><TR  
+
+><TD  
+ width="92"  valign="top" height="18" 
+></TD><TD  
+ align="left" width="477"  valign="top" height="18" 
+>para modificar el bit Z. Su principal utilidad es descubrir si un </TD
+></TR
+><TR  
+
+><TD  
+ width="92"  valign="top" height="25" 
+></TD><TD  
+ align="left" width="477"  valign="top" height="25" 
+>determinado bit del acumulador es 1. </TD
+></TR
+><TR  
+
+><TD  
+ align="center" width="92"  valign="bottom" height="29" 
+>NOT </TD
+><TD  
+ align="left" width="477"  valign="bottom" height="29" 
+>Calcula el complemento a uno del acumulador y deja el resultado. </TD
+></TR
+></TABLE
+></DIV
+><DIV class="Sect" 
+
+><H4 
+
+><FONT size="+1"><B>1.2.4 Instrucciones de salto </H4
+><P 
+
+><FONT size="+1"></font></B><FONT size="+1">JMP <I>ar</I><I>g	</I>Cambia el contenido del contador de programa por la direcci&oacute;n efectiva calculada a partir de <I>arg</I>. El salto incondicional no dispone de forma inmediata. </P
+><P 
+
+>JC <I>arg </I>Efect&uacute;an saltos condicionales sumando el valor de arg al contador de JNC <I>arg </I>programa. En la suma se considera que <I>arg</I> se da en complemento a 2, JZ <I>arg </I>de esta forma el salto se puede realizar hacia delante o hacia detr&aacute;s JNZ <I>arg </I>dependiendo del signo de <I>arg</I>. </P
+><P 
+
+>El salto se efectuar&aacute; dependiendo de si el bit de <I>carry</I> (C) es 0 (JNC) o 1 (JC), o si el bit de <I>zero</I>  (Z) es 0 (JNZ ) o 1 (JZ). En el caso contrario no se efect&uacute;a ning&uacute;n salto. Hay que tener en cuenta que la instrucci&oacute;n JC -1 puede ser un bucle infinito si C=1, porque efectuar&aacute; el salto decrementando el CP en 1; es decir situ&aacute;ndose como siguiente instrucci&oacute;n. </P
+><P 
+
+>HLT 	Para la m&aacute;quina. La m&aacute;quina se mantiene inactiva hasta que se hace un reset y se inicia la ejecuci&oacute;n en la instrucci&oacute;n que se encuentre en la posici&oacute;n 0 de la memoria.  </P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+><FONT size="+1"><B>1.2.5 Desplazamientos y rotaciones </H4
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">A veces puede ser necesario acceder a los bits de un <I>byte; </I>hay un conjunto de instrucciones que permiten acceder a los bits del acumulador de forma r&aacute;pida e individual. Estas instrucciones afectan el bit de zero, que se pone a 1 cuando todos los bits del acumulador son 0, y al bit de carry que toma el valor del bit que se desplaza entre los extremos del acumulador. </P
+><P 
+ align="justify"
+>ROL 	Efect&uacute;a una rotaci&oacute;n a la izquierda de los bits del acumulador. De forma que el bit m&aacute;s significativo pasa a ser el menos significativo y tambi&eacute;n se asigna al indicador de acarreo: </P
+><IMG align="" width="239" height="71"
+ src="images/help_img_0.jpg" ><P 
+ align="justify"
+>ROR Efect&uacute;a una rotaci&oacute;n a la derecha de los bits del acumulador. Deja el bit menos significativo como bit de acarreo: </P
+><IMG align="" width="239" height="71"
+ src="images/help_img_1.jpg" ><P 
+ align="justify"
+>RCL 	Realiza una rotaci&oacute;n a la izquierda de los bits del acumulador y del bit de acarreo. El bit m&aacute;s significativo del acumulador se copia al indicador C y este a la posici&oacute;n menos significativa del acumulador: </P
+><IMG align="" width="239" height="71"
+ src="images/help_img_2.jpg" ><P 
+ align="justify"
+>RCR Realiza una rotaci&oacute;n de los bits del acumulador y de los de acarreo una posici&oacute;n a la derecha: </P
+><IMG align="" width="239" height="71"
+ src="images/help_img_3.jpg" ><P 
+ align="justify"
+>SHL 	Desplaza los bits del acumulador una posici&oacute;n hacia la izquierda, pone un 0 como bit menos significativo del acumulador y copia el bit m&aacute;s significativo en el indicador de acarreo: </P
+><IMG align="" width="247" height="71"
+ src="images/help_img_4.jpg" ><P 
+ align="center"
+>Esta operaci&oacute;n equivale a multiplicar por 2 el valor del registro A. </P
+><P 
+ align="justify"
+>SHR 	Desplaza los bits del acumulador una posici&oacute;n hacia la derecha. El bit m&aacute;s significativo se pone a 0. El bit menos significativo pasa al indicador de acarreo: </P
+><IMG align="" width="253" height="69"
+ src="images/help_img_5.jpg" ><P 
+ align="justify"
+>Esta operaci&oacute;n equivale a dividir enteramente por 2 el n&uacute;mero natural que se guarda en el registro A. </P
+><P 
+ align="justify"
+>SCL 	Desplaza los bits del acumulador una posici&oacute;n hacia la izquierda. El bit m&aacute;s significativo se pierde y el menos significativo toma el valor del </P
+><IMG align="" width="337" height="81"
+ src="images/help_img_6.jpg" ><P 
+ align="justify"
+>SCR Efect&uacute;a un desplazamiento de los bits del registro A una posici&oacute;n hacia la derecha de manera que el bit m&aacute;s significativo toma el valor del de </P
+><IMG align="" width="332" height="87"
+ src="images/help_img_7.jpg" ><P 
+ align="justify"
+>Esta operaci&oacute;n equivale a dividir el contenido del acumulador por 2, siempre que el bit C tenga el mismo valor que el bit de signo del n&uacute;mero que se guarda. Si se trabaja con n&uacute;meros naturales el acarreo debe ser 0. </P
+><P 
+ align="justify"
+>CLC Estas instrucciones permiten apagar el bit de acarreo (CLC) o activarlo STC (STC). </P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+><FONT size="+1"><B>1.2.6 Comunicaci&oacute;n con el exterior </H4
+><P 
+ align="justify"
+><FONT size="+1"></font></B><FONT size="+1">La m&aacute;quina elemental puede enviar y recibir datos a trav&eacute;s de los puertos, que transfieren la informaci&oacute;n desde o hacia el acumulador. </P
+><P 
+ align="justify"
+>Hay 8 puertos de entrada y otros 8 de salida, identificados con los n&uacute;meros comprendidos entre el 0 y el 7. Hay otros 8 puertos de entrada/salida que se identifican con los n&uacute;meros del 8 al 15. </P
+><P 
+ align="justify"
+>El repertorio de instrucciones tiene dos instrucciones que permiten escribir o leer datos de los puertos. La instrucci&oacute;n OUT <I>num_puerto </I>transfiere el contenido del acumulador al puerto de salida identificado con el n&uacute;mero <I>num_puerto. </I>En cambio, INP <I>num_puerto </I>copia la informaci&oacute;n contenida en el puerto identificado con el n&uacute;mero <I>num_puerto</I> al acumulador. </P
+><P 
+ align="justify"
+>Para los casos en los que no se puede determinar en que momento se debe realizar la operaci&oacute;n de entrada/salida, la ME dispone de 8 l&iacute;neas para hacer peticiones y otras 8 para recibir contestaci&oacute;n de conformidad. </P
+><P 
+ align="justify"
+>Para poner una l&iacute;nea de petici&oacute;n a 0 se utiliza la instrucci&oacute;n RQL <I>num_l&iacute;nea</I>, i a 1 con RQH <I>num_l&iacute;nea</I>. Las instrucciones AKL <I>num_l&iacute;nea</I> espera que haya un 0 en la l&iacute;nea <I>num_l&iacute;nea</I> y AKH <I>num_l&iacute;nea</I> espera a que haya un 1 en la l&iacute;nea <I>num_l&iacute;nea</I>. Mientras se esta esperando la conformidad de alguna l&iacute;nea, la m&aacute;quina se detiene hasta que no encuentre el bit esperado en la l&iacute;nea correspondiente. </P
+></DIV
+></DIV
+><DIV class="Sect" 
+
+><H3 
+ align="left"
+><B>1.3 Tabla de instrucciones ordenada por c&oacute;digo de operaci&oacute;n </H3
+><TABLE 
+ align="center" border=0 cellspacing=0 cellpadding=2
+><TR  
+
+><TH 
+ align="left" width="231"  valign="top" height="28" 
+><FONT size="+1">C&oacute;digo de operaci&oacute;n </TH
+><TH 
+ align="left" width="73"  valign="top" height="28" 
+>Nombre </TH
+><TH 
+ align="left" width="265"  valign="top" height="28" 
+>Descripci&oacute;n en ingl&eacute;s  </TH
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="28" 
+></B>000<direcci&oacute;n relativa> </TD
+><TD  
+ align="left" width="73"  valign="middle" height="28" 
+>JC </TD
+><TD  
+ align="left" width="265"  valign="middle" height="28" 
+>Jump if Carry </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>001<direcci&oacute;n relativa> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>JNC </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>Jump if No Carry </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>010<direcci&oacute;n relativa> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>JZ </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>Jump if Zero </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>011<direcci&oacute;n relativa> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>JNZ </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>Jump if No Zero </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1000<direcci&oacute;n del puerto> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>OUT </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>OUTput through port </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1001<direcci&oacute;n del puerto> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>INP </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>INPut from port </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>10100<n&ordm; de se&ntilde;al> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>RQL </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>send ReQuest Low </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="19" 
+>10101<n&ordm; de se&ntilde;al> </TD
+><TD  
+ align="left" width="73"  valign="top" height="19" 
+>RQH </TD
+><TD  
+ align="left" width="265"  valign="top" height="19" 
+>send ReQuest High </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>10110<n&ordm; de se&ntilde;al> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>AKL </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>wait for AcKnowledge Low </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>10111<n&ordm; de se&ntilde;al> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>AKH </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>wait for AcKnowledge High </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="16" 
+>1100 0000 </TD
+><TD  
+ align="left" width="73"  valign="top" height="16" 
+>ROL </TD
+><TD  
+ align="left" width="265"  valign="top" height="16" 
+>ROtation Left </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="21" 
+>1100 0001 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="21" 
+>ROR </TD
+><TD  
+ align="left" width="265"  valign="middle" height="21" 
+>ROtation Right </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 0010 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>RCL </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>ROtation (with carry) Left </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 0011 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>RCR </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>ROtation (with carry) Right </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="16" 
+>1100 0100 </TD
+><TD  
+ align="left" width="73"  valign="top" height="16" 
+>SHL </TD
+><TD  
+ align="left" width="265"  valign="top" height="16" 
+>SHift Left </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="21" 
+>1100 0101 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="21" 
+>SHR </TD
+><TD  
+ align="left" width="265"  valign="middle" height="21" 
+>SHift Right </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 0110 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>SCL </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>SHift (with carry) Left </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 0111 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>SCR </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>SHift (with carry) Right </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 1000 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>CLC </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>CLear Carry </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 1001 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>STC </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>SeT Carry </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 1010 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>NOT </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>bitwise one&rsquo;s complement of A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1100 1011 </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>NEG </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>two&rsquo;s complement of A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="16" 
+>1100 1100 </TD
+><TD  
+ align="left" width="73"  valign="top" height="16" 
+>INA </TD
+><TD  
+ align="left" width="265"  valign="top" height="16" 
+>Increment A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1100 1101 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>DCA </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>DeCrement A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1100 1110 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>INX </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>Increment X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1100 1111 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>DCX </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>DeCrement X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 00<modo direccionamiento> </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>LDA </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>LoaD A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 01<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>LDX </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>LoaD X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 10<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>STA </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>STore A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 10 11 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>TAX </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>Transfer A to X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 11<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>STX </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>STore X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="18" 
+>1101 11 11 </TD
+><TD  
+ align="left" width="73"  valign="middle" height="18" 
+>TXA </TD
+><TD  
+ align="left" width="265"  valign="middle" height="18" 
+>Transfer X to A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="middle" height="21" 
+>1110 00<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="middle" height="21" 
+>TST </TD
+><TD  
+ align="left" width="265"  valign="middle" height="21" 
+>TeST: bitwise AND discarding result </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1110 01<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>AND </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>AND with operand </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1110 10<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>XOR </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>XOR with operand </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1110 11<modo direccionamiento> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>OR </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>OR with operand </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1111 00<modo direccionamiento>   </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>CMP </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>CoMPare: substraction discarding result </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1111 01<modo direccionamiento> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>SUB </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>SUBtract operand from A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="18" 
+>1111 10<modo direccionamiento> </TD
+><TD  
+ align="left" width="73"  valign="top" height="18" 
+>ADD </TD
+><TD  
+ align="left" width="265"  valign="top" height="18" 
+>ADD operand to A </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="top" height="16" 
+>1111 11<modo direccionamiento> </TD
+><TD  
+ align="left" width="73"  valign="top" height="16" 
+>JMP </TD
+><TD  
+ align="left" width="265"  valign="top" height="16" 
+>JuMP to effective address </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="231"  valign="bottom" height="15" 
+>1111 11 11 </TD
+><TD  
+ align="left" width="73"  valign="bottom" height="15" 
+>HLT </TD
+><TD  
+ align="left" width="265"  valign="bottom" height="15" 
+>HaLT </TD
+></TR
+></TABLE
+></b></font></font></font></font></font></font></font></font></font></font>
+      </font></font></font></font></font></font></font></font></font></font>
+      </font></font><B><FONT color="#000000"><P 
+ align="center"
+>Tabla 1. </font></b><FONT color="#000000">Repertorio de instrucciones de la m&aacute;quina elemental YASP</font><FONT size="+1" color="#000000"><FONT size="+2"><FONT size="+1"><FONT size="+2" color="#000000"><FONT size="+2"><B> </P
+></DIV
+></DIV
+><DIV class="Sect" 
+
+><H2 
+ align="justify"
+><FONT size="+2"><B>2 Manual de usuario </H2
+><P 
+ align="justify"
+><FONT size="+1"></font></B></font></b><FONT size="+2"><FONT size="+1">En este cap&iacute;tulo se describe la interfaz de usuario de la versi&oacute;n Javascript del simulador de YASP. Se trata de una interfaz muy simple en la que la informaci&oacute;n se organiza en subventanas: una para el c&oacute;digo en ensamblador y otras para el procesador YASP. En estas &uacute;ltimas, una se dedica a la memoria, otra a los registros, otra a los indicadores de acarreo y de cero, otra a los puertos de entrada y salida y, finalmente, otra a las l&iacute;neas de petici&oacute;n y aceptaci&oacute;n. (En una ventana adicional se muestra un peque&ntilde;o <I>display </I>conectado a los puertos de salida, para que los programas puedan mostrar al usuario su estado de funcionamiento.) La modificaci&oacute;n de los datos del procesador por parte del usuario supone hacer un clic de rat&oacute;n en la celda que corresponda, mientras que la modificaci&oacute;n del programa ensamblador debe hacerse siguiendo las normas del ensamblador de YASP en la ventana de texto correspondiente. </P
+><B><DIV class="Sect" 
+
+><H3 
+ align="justify"
+><FONT size="+1"><B>2.1 Descripci&oacute;n del interfaz </H3
+><P 
+ align="justify"
+><FONT size="+1"></font></B></font></b><FONT size="+1"><FONT size="+1">YASP engloba la totalidad de funcionalidades en una &uacute;nica superficie de trabajo desde donde se ejecutan todos los comandos. Una vez cargada la p&aacute;gina se diferencian 7 zonas en la pantalla. </P
+><P 
+ align="justify"
+><I>Code. </I>Formada por una caja de texto, en la que se introduce el c&oacute;digo que se desea ensamblar para su posterior ejecuci&oacute;n en la m&aacute;quina elemental y dos botones <I>Assemble </I>y <I>Clear </I>, que ensamblan y borran el texto introducido en la caja de texto, respectivamente.  </P
+><B><IMG align="" width="567" height="176"
+ src="images/help_img_8.jpg" ></b></font></font></font></font></font></font></font></font></font><B><FONT color="#000000"><P 
+ align="left"
+>Figura 1. </font></b><FONT color="#000000">Detalle de la zona <I>Code </I></P
+></font><FONT size="+2"><FONT size="+1" color="#000000"><FONT size="+1">
+      <FONT size="+2" color="#000000"><FONT size="+1" color="#000000"><P 
+ align="justify"
+><I>Memory</I>. Contiene un marco en el que se muestra una tabla con el contenido de las 256 posiciones de memoria. Cada fila esta dividida en 4 columnas en las que se puede ver si esta activada o no como punto de ruptura, la posici&oacute;n de memoria en base hexadecimal, el nombre de la etiqueta en el caso de que exista y su contenido. </P
+><P 
+ align="justify"
+>En la parte inferior hay 4 botones (Quit, Reset, Execute, Step) que permiten interactuar con la m&aacute;quina elemental. </P
+><B><IMG align="" width="272" height="281"
+ src="images/help_img_9.jpg" ></b></font></font></font></font></font><B><FONT color="#000000"><P 
+ align="left"
+>Figura 2. </font></b><FONT color="#000000">Detalle de la zona <I>Memory </I></P
+><P 
+ align="justify"
+><I><font size="4">Registers</font></I><font size="4">. Compuesta por una tabla donde se pueden ver y modificar el valor de los diferentes registros de la m&aacute;quina elemental excepto el IR no modificable por el usuario. Cada registro esta representado en binario, hexadecimal, natural, entero y ASCII excepto el IR que se muestra en binario, hexadecimal y como instrucci&oacute;n.
+      </font> </P
+></font><B><FONT size="+1" color="#000000"><IMG align="" width="283" height="169"
+ src="images/help_img_10.jpg" ></font></b><FONT color="#000000"><P 
+
+><b>Figura 3.</b> Detalle de la zona <I>Registers Flags.</I></P
+></font><FONT size="+1" color="#000000"><P 
+
+>Permite ver y modificar el contenido de los flags de <I>Carry</I> y <I>Zero. </I></P
+><B><IMG align="left" width="187" height="53"
+ src="images/help_img_11.jpg" ><P 
+ align="center"
+>&nbsp;</P
+><P 
+ align="center"
+>&nbsp;</P
+></b></font><FONT color="#000000"><P 
+ align="left"
+><b>Figura 4. </b>Detalle de la zona <I>Flags </I></P
+></font><FONT size="+1" color="#000000"><P 
+ align="justify"
+><I>Display. </I>Formado por una tabla en la que se puede ver el valor, representado en car&aacute;cter ASCII, de los puertos de salida del 0 al 7. </P
+><B><IMG align="" width="227" height="59"
+ src="images/help_img_12.jpg" ></b></font><FONT color="#000000"><P 
+ align="left"
+><b>Figura 5. </b>Detalle de la zona <I>Display </I></P
+></font><FONT size="+1" color="#000000"><P 
+ align="justify"
+><I>Comunication ports</I>. Formado por una tabla en la que se pueden ver y modificar el valor de los puertos que forman la m&aacute;quina elemental. Los puertos de entrada muestran el valor en ASCII si es posible y en su defecto en hexadecimal.  Los puertos de salida comprendidos entre el 8 y el 15 mantienen el mismo criterio a la hora de mostrarlos por pantalla, en cambio, los puertos de salida comprendidos entre el 0 y el 7 siempre muestra el valor del puerto en base hexadecimal, ya que la representaci&oacute;n en car&aacute;cter ASCII de los mismos esta reservada para el <I>Display. </I></P
+><IMG align="" width="216" height="192"
+ src="images/help_img_13.jpg" ></font><FONT color="#000000"><P 
+ align="left"
+><b>Figura 6.</b> Detalle de la zona <I>Comunication ports </I></P
+></font><FONT size="+1" color="#000000"><P 
+ align="justify"
+><I>Acknowledgement/request</I>. Formado por un conjunto de cajas seleccionables que permiten ver y modificar el estado de las 8 l&iacute;neas de <I>Acknowledgement </I>y ver el estado de las 8 l&iacute;neas de<I> Request. </I></P
+><IMG align="" width="223" height="87"
+ src="images/help_img_14.jpg" ></font><FONT color="#000000"><P 
+ align="left"
+><b>Figura 7.</b> Detalle de la zona <I>Acknowledgement/request </I></P
+></DIV
+></font><FONT size="+1" color="#000000"><FONT size="+1" color="#000000"><DIV class="Sect" 
+
+><H3 
+ align="justify"
+><FONT size="+1">2.2 Funcionamiento de la m&aacute;quina elemental </H3
+><P 
+ align="justify"
+>Una vez cargado YASP, se muestra toda la informaci&oacute;n guardada en la m&aacute;quina elemental, con todos los registros, puertos y posiciones de memoria inicializados a 0. En el caso del registro IR se inicializa con la instrucci&oacute;n JC 0 y la primera posici&oacute;n de memoria con la instrucci&oacute;n HLT, que para la m&aacute;quina. </P
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+>2.2.1 C&oacute;mo cargar un programa </H4
+><P 
+ align="justify"
+>Para poder cargar un programa en memoria se escribe el c&oacute;digo en la caja de texto <I>Code </I>(Figura 1) para su posterior ensamblaje y ejecuci&oacute;n en la m&aacute;quina elemental. Pulsando el bot&oacute;n <I>Assemble </I>se verifica sint&aacute;ctica y sem&aacute;nticamente el c&oacute;digo introducido, carg&aacute;ndolo en memoria si no hay errores. En el caso de que se haya producido alg&uacute;n error nos informa mediante una alerta. Para borrar el contenido de la caja de texto debemos pulsar el bot&oacute;n <I>Clear</I> que pedir&aacute; confirmaci&oacute;n. </P
+><P 
+ align="justify"
+>Una vez cargado el programa ya se puede ejecutar tal y como se explica en la siguiente secci&oacute;n. </P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+>2.2.2 C&oacute;mo ejecutar un programa </H4
+><P 
+ align="justify"
+>El programa se puede ejecutar de dos formas: paso a paso (<I>Step</I>) en la que se ejecuta una instrucci&oacute;n y se detiene o continuada (<I>Execute</I>) en la que se ejecuta instrucci&oacute;n tras instrucci&oacute;n de forma que la m&aacute;quina solo se detiene cuando se encuentra con un punto de ruptura o con una instrucci&oacute;n de espera (AKL, AKH o HLT). Independientemente del modo de ejecuci&oacute;n que utilicemos se destaca en color azul la pr&oacute;xima instrucci&oacute;n  a ejecutar, en la memoria y en la caja de texto Code (Figura 8). </P
+><P 
+ align="justify"
+>Podemos querer ejecutar un programa hasta un punto determinado, puesto que, a veces, es muy tedioso ejecutarlo paso a paso. Con esta finalidad es posible establecer puntos de ruptura, de manera que el programa se va ejecutando hasta encontrar una instrucci&oacute;n marcada. </P
+><IMG align="" width="267" height="333"
+ src="images/help_img_15.jpg" ></font></font></font><FONT color="#000000"><P 
+ align="left"
+><b>Figura 8.</b> Ejecuci&oacute;n de un programa </P
+></font><FONT size="+1" color="#000000"><P 
+ align="justify"
+>Para definir un punto de ruptura hay pulsar con el rat&oacute;n en la primera celda de cualquiera de las 256 filas de la memoria en la que se quiere parar la m&aacute;quina. Una vez hecho cambia el color de fondo a rojo. Para eliminarlo simplemente hay que repetir el proceso. </P
+><P 
+ align="justify"
+>Podemos inicializar la m&aacute;quina pulsando el bot&oacute;n <I>Reset, </I>que pone a 0 el PC y el IR, con el consiguiente cambio en las ventanas de la memoria y del c&oacute;digo. </P
+></DIV
+><DIV class="Sect" 
+
+><H4 
+ align="justify"
+>2.2.3 Interacci&oacute;n con los diferentes elementos </H4
+><P 
+ align="justify"
+>Debido al espaci&oacute; limitado para mostrar la informaci&oacute;n, el contenido de las posiciones de memoria solo se muestra seg&uacute;n el tipo de la &uacute;ltima informaci&oacute;n que se haya insertado. A pesar de esto hay que tener en cuenta que los valores se pueden dar de 5 formas diferentes: </P
+><B><TABLE 
+ align="center" border=0 cellspacing=0 cellpadding=2
+><TR  
+
+><TD  
+ align="left" width="128"  valign="top" height="18" 
+>tipo de dato </TD
+><TD  
+ align="center" width="74"  valign="top" height="18" 
+>prefijo </TD
+><TD  
+ align="left" width="87"  valign="top" height="18" 
+>ejemplo </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="128"  valign="top" height="19" 
+>decimal sin signo </TD
+><TD  
+ align="center" width="74"  valign="top" height="19" 
+>ninguno </TD
+><TD  
+ align="right" width="87"  valign="top" height="19" 
+>135 </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="128"  valign="top" height="18" 
+>decimal con signo </TD
+><TD  
+ align="left" width="74"  valign="top" height="18" 
+>+o-</TD
+><TD  
+ align="right" width="87"  valign="top" height="18" 
+>-15 </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="128"  valign="top" height="16" 
+>hexadecimal </TD
+><TD  
+ align="left" width="74"  valign="top" height="16" 
+>$ </TD
+><TD  
+ align="right" width="87"  valign="top" height="16" 
+>$FF </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="128"  valign="middle" height="18" 
+>binario </TD
+><TD  
+ align="left" width="74"  valign="middle" height="18" 
+>% </TD
+><TD  
+ align="right" width="87"  valign="middle" height="18" 
+>%01010001</TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="128"  valign="bottom" height="15" 
+>car&aacute;cter ASCII </TD
+><TD  
+ align="left" width="74"  valign="bottom" height="15" 
+>&lsquo; </TD
+><TD  
+ align="right" width="87"  valign="bottom" height="15" 
+>&lsquo;A </TD
+></TR
+></TABLE
+></b></font><FONT color="#000000"><P 
+ align="center"
+><b>Tabla 2.</b> Tipos de datos </P
+></font><FONT size="+1" color="#000000"><P 
+
+>El programa permite modificar el contenido de la memoria, registros, flags y  elementos de comunicaci&oacute;n con el exterior. Veamos a continuaci&oacute;n como se hace para cada uno de ellos: </P
+><P 
+
+><I>Memoria. </I>Para modificar el contenido de una posici&oacute;n hay que pulsar en la cuarta columna de la fila, que corresponde al contenido de la memoria.  Mediante una ventana de secuencias de comandos se introduce un valor o una instrucci&oacute;n. Hay que tener en cuenta que en el caso de insertar una instrucci&oacute;n, hay que introducir su mnem&oacute;nico i sus posibles argumentos. Si la instrucci&oacute;n puede utilizar alg&uacute;n modo de direccionamiento, hay que introducirla en uno de los 4 formatos correctos: </P
+><B><TABLE 
+ align="center" border=0 cellspacing=0 cellpadding=2
+><TR  
+
+><TH 
+ align="left" width="164"  valign="top" height="18" 
+><span style="font-weight: 400">Modo direccionamiento </span> </TH
+><TH 
+ colspan=3 align="left" width="202"  valign="top" height="18" 
+><span style="font-weight: 400">Especificaci&oacute;n </span> </TH
+></TR
+><TR  
+
+><TD  
+ align="left" width="164"  valign="top" height="17" 
+>directo </TD
+><TD  
+ colspan=2 align="left" width="110"  valign="top" height="17" 
+>OPCODE </TD
+><TD  
+ align="left" width="92"  valign="top" height="17" 
+>direcci&oacute;n </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="164"  valign="middle" height="20" 
+>indexado </TD
+><TD  
+ colspan=2 align="left" width="110"  valign="middle" height="20" 
+>OPCODE </TD
+><TD  
+ align="right" width="92"  valign="middle" height="20" 
+>direcci&oacute;n , X </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="164"  valign="top" height="17" 
+>indirecto </TD
+><TD  
+ align="left" width="83"  valign="top" height="17" 
+>OPCODE </TD
+><TD  
+ align="center" width="27"  valign="top" height="17" 
+>* </TD
+><TD  
+ align="left" width="92"  valign="top" height="17" 
+>direcci&oacute;n </TD
+></TR
+><TR  
+
+><TD  
+ align="left" width="164"  valign="middle" height="20" 
+>inmediato </TD
+><TD  
+ align="left" width="83"  valign="middle" height="20" 
+>OPCODE </TD
+><TD  
+ align="center" width="27"  valign="middle" height="20" 
+># </TD
+><TD  
+ align="left" width="92"  valign="middle" height="20" 
+>operando </TD
+></TR
+></TABLE
+></b></font><FONT color="#000000"><P 
+ align="center"
+><b>Tabla 3.</b> Modos de direccionamiento </P
+></font><FONT size="+1" color="#000000"><P 
+ align="justify"
+>Donde hay que sustituir OPCODE por alg&uacute;n mnem&oacute;nico valido. Hay que tener presente que no existen formas inmediatas para las instrucciones STA, STX i JMP. </P
+><P 
+ align="justify"
+><I>Registros. </I>Para modificar el valor de los registros, exceptuando el IR que no es modificable por el usuario, basta con pulsar sobre el bot&oacute;n que identifica a cada uno de ellos e introducir el valor en una de las 5 formas posibles (Tabla 
+        2). </P
+><P 
+ align="justify"
+><I>Flags. </I>Los flags de <I>Carry</I> y <I>Zero</I> pueden estar activados o no. Basta con pulsar sobre el bot&oacute;n que los identifica para cambiar al estado contrario. </P
+><P 
+ align="justify"
+><I>Comunicaci&oacute;n exterior. </I>Como elementos de comunicaci&oacute;n con el exterior, se dispone de los puertos y de las l&iacute;neas de petici&oacute;n/contestaci&oacute;n. De los <I>Comunication Ports</I> son modificables los puertos de entrada identificados con los n&uacute;meros del 0 al 8 y los puertos de entrada/salida identificados con los n&uacute;meros del 8 al 15. Los puertos de salida comprendidos entre el 0 y el 8 solo se modifican cuando se ejecuta la instrucci&oacute;n OUT <n&ordm; de puerto> y est&aacute;n conectados con el <I>Display,</I> de forma que la modificaci&oacute;n del valor de un puerto supone la actualizaci&oacute;n autom&aacute;tica de la correspondiente se&ntilde;al en el <I>Display</I>. De esta forma se puede ver la representaci&oacute;n en hexadecimal (puerto) y en car&aacute;cter ASCII (display). Para modificar el valor, basta con pulsar en uno de los 16 puertos e introducir el valor en una de las 5 formas posibles (Tabla 
+        2). </P
+><P 
+ align="justify"
+>En los casos en los que no se pueda determinar cuando hay que realizar una operaci&oacute;n de entrada/salida tenemos 8 l&iacute;neas para realizar peticiones (REQ) y de otras 8 para recibir contestaci&oacute;n de conformidad (ACK). Para modificar el estado de una se&ntilde;al ACK hay que pulsar sobre la caja seleccionable correspondiente a la se&ntilde;al que se desea activar o desactivar. Las se&ntilde;ales de REQ solo son de lectura, por lo que solo se puede modificar su contenido ejecutando la instrucci&oacute;n RQL <n&ordm; se&ntilde;al> o RQH <n&ordm; se&ntilde;al>. </P
+></DIV
+></DIV
+></DIV
+><B><DIV class="Sect" 
+
+><H2 
+ align="justify"
+><FONT size="+2">Referencias </H2
+></font></b></font><FONT color="#000000"><P 
+ align="justify"
+>[1] Llu&iacute;s Ribas Xirgo (2000). <I>Pr&agrave;ctiques de fonaments de computadors. </I>Servei de Publicacions de la Universitat Aut&ograve;noma de Barcelona. Bellaterra. </P
+><P 
+ align="justify"
+>[2] David Rodr&iacute;guez Jurado (2005). <I>jsYASP: Simulador de un procesador docente</I>. Projecte fi de carrera d&rsquo;Enginyeria Inform&agrave;tica. UAB. Bellaterra. </P
+></DIV
+></DIV
+></BODY>
+</HTML>

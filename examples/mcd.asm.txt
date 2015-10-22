@@ -1,0 +1,24 @@
+; Maximum common divisor (MCD)
+
+datA	=	2	; Input ports for data
+datB	=	3
+mcdAB   =	8	; Output port for result
+
+start:	INP	datB
+	STA	B
+	INP	datA
+loop:	CMP	B
+	JC	A_gt_B	; A > B
+	LDX	B	; Swaps A & B values by 
+	STA	B	; using X as auxiliary variable.
+	TXA
+A_gt_B: TAX		; Stores A in X
+	LDA	B	; to compare B
+	CMP	#0	; with 0
+	TXA		; Restores the greater value into A.
+	JZ	end	; If the lesser value was 0, ends.
+	SUB	B	; Subtracts B to the accumulator A.
+	JMP	loop
+end:	OUT	mcdAB	
+	HLT
+B:	DB	?	; Auxiliary byte for operations

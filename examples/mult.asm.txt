@@ -1,0 +1,46 @@
+; Integer multiplication
+
+source	=	0	; Input port for numbers
+
+start:	LDA	#0	; Sets result to 0
+	STA	RH
+	STA	RL
+	AKL	0
+	INP	source
+	STA	MD	; Stores multiplicand
+	AKL	0
+	INP	source
+	STA	MR	; Stores multiplier
+
+	LDX	#8	; Multiplier's bit counter
+
+step:	LDA	MR	; Obtains next multiplier's bit
+	ROR		; (It makes a rotation to have the
+	STA	MR	;  multiplier restored at the end)
+	JNC	bypass
+	LDA	RH	; If bit = 1, adds multiplicand to result
+	ADD	MD
+	JMP	shift
+bypass:	LDA	RH	; Otherwise, result is not modified 
+
+shift:	RCR		; Shifts the result to right by
+	STA	RH	; taking into account the event of a carry
+	LDA	RL
+	SCR
+	STA	RL
+
+next:	DCX		; Checks if all 8 products are done
+	JZ	cont	; In case not, repeats the procedure for
+	JMP	step	; the next multiplier's bit.
+
+cont:	LDA	RH
+	OUT	09
+	LDA	RL
+	OUT	08
+
+	HLT
+
+RL:	DB	$00	; Least significant byte of result
+RH:	DB	$00	; Most significant byte of result
+MD:	DB	$00	; Multiplicand
+MR:	DB	$00	; Multiplier

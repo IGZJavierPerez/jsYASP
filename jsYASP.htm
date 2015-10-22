@@ -1,0 +1,2445 @@
+<!DOCTYPE HTML PUBLIC>
+<HTML><HEAD><TITLE>jsYASP v2.0: Yet Another Simple Processor for educative purposes</TITLE>
+<META http-equiv=Content-Type content="text/html; charset=iso-8859-1">
+<META http-equiv=CACHE-CONTROL content=NO-CACHE>
+<!--
+    jsYASP is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; version 2.
+
+    jsYASP is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+    www.gnu.org
+-->
+<!--
+    Should you refer to this software, please, do use the following references:
+	[Rib10b] Lluís Ribas-Xirgo. "Yet Another Simple Processor (YASP) for
+             Introductory Courses on Computer Architecture",
+             in 'Ind. Electronics., Trans. on,' Vol. 57, pp. 3317 - 3323. Oct. 2010. 
+    [Rib10a] Lluís Ribas-Xirgo. "YASP: Educational processor's IDE." in yasptoolkit.sourceforge.net,
+             since Jan. 2010.
+	[RR05]   David Rodríguez-Jurado, Lluís Ribas-Xirgo.
+             "jsYASP: Un simulador de un procesador educativo en Javascript" (in Spanish),
+             in 'Actas de las Jornadas de la ENseñanza Universitaria de la Informática (JENUI).'
+             Jul. 2005.
+-->
+
+<STYLE type="text/css">
+.texto { FONT-WEIGHT: normal;
+         FONT-SIZE: 11px;
+         COLOR: #000000;
+         FONT-STYLE: normal;
+         FONT-FAMILY: Verdana;
+         TEXT-DECORATION: none
+}
+.textoBold { FONT-WEIGHT: bold;
+             FONT-SIZE: 11px;
+             COLOR: #000000;
+             FONT-FAMILY: Verdana
+}
+.textInput {
+	FONT-SIZE: 10px; COLOR: #000000; FONT-FAMILY: Verdana; BACKGROUND-COLOR: #fcfcfc
+}
+.FormButton {
+	BORDER-RIGHT: #b5b5b5 1px solid; BORDER-TOP: #b5b5b5 1px solid; FONT-SIZE: 11px;
+  BACKGROUND: #cccccc; BORDER-LEFT: #b5b5b5 1px solid; CURSOR: hand; COLOR: #333333;
+  BORDER-BOTTOM: #b5b5b5 1px solid; FONT-FAMILY: Verdana, Arial
+}
+</STYLE>
+
+<SCRIPT language=JavaScript type=text/JavaScript>
+
+///////////////////////////////////////////////////////////////////////////////
+// YASP base classes:
+///////////////////////////////////////////////////////////////////////////////
+
+SymbolTable = new Array();
+Mnemonic = new Array( 256 );
+
+// Tag values
+BIN = 0;      // Binary
+HEX = 1;      // Hexadecimal
+ASC = 2;      // ASCII
+NAT = 3;      // Natural, i.e. unsigned decimal
+DEC = 4;      // Integer, i.e. signed decimal
+OPCODE = 5;   // Operation code
+IOPCODE = 6;  // Incomplete operation code
+ADDR = 7;     // Address
+UADDR = 8;    // Unresolved address
+UNKWN = 9;    // Unknownn
+
+function taggedValue( str, tag )
+// Either gets a value from 'str' and sets its tag to 'tag' or
+// reads a value from string 'str' and determines its type (tag) and value
+// on failure, creates an object with tag UNKWN and value %00000000
+{
+  if( tag != null ) { // actual call is "taggedValue( tag, val )"
+    this.tag = tag;
+    this.value = eval( str );
+  } else {
+    str = str.toString().replace(/^\s+|\s+$/g,'');
+    if( /^[\+|-]/.test(str) ) { // signed value
+      this.tag = DEC;
+      this.value = parseInt( str );
+    } else if( str.charAt(0)=='$' ) { // hexadecimal
+      this.tag = HEX;
+      this.value = parseInt( str.substr(1), 16 );
+    } else if( str.charAt(0)=='%' ) { // binary
+      this.tag = BIN;
+      this.value = parseInt( str.substr(1), 2 );
+    } else if( str.charAt(0)=="'" ) { // ASCII
+      this.tag = ASC;
+      if( str.length > 1 ) {
+        this.value = str.charCodeAt(1);
+      } else {
+        this.value = 32;
+      } // if
+    } else if( /^\d/.test(str) ) { // unsigned value
+      this.tag = NAT;
+      if( /^0/.test(str) ) { // JS will take it as octal -- remove leading 0s
+        str = str.replace(/^0+/, '');
+      } // if
+      this.value = eval( str );
+    } else if( /^\w/.test(str) ) { // check possible symbol value
+      str = str.match(/^\w+/)[0].toUpperCase();
+      if( SymbolTable[str] != null ) {
+        this.tag = SymbolTable[str].taggedval.tag;
+        this.value = SymbolTable[str].taggedval.value;
+      } else { // unknown
+        this.tag = UNKWN;
+        this.value = 0;
+      } // if
+    } else { // unknown
+      this.tag = UNKWN;
+      this.value = 0;
+    } // else-if
+  } // if
+  this.value &= 0xFF; // only 8-bit values allowed
+} // taggedValue
+
+taggedValue.prototype.toString = function( ftag )
+{
+  var zpad = "00000000";
+  var spad = "   ";
+  var retstr = "";
+  var stag = this.tag;
+  
+  if( ftag != null ) {
+    stag = ftag;
+  } // if
+  switch( stag ) {
+    case BIN:     retstr = this.value.toString(2);
+                  retstr = "%" + zpad.substr(0, 8-retstr.length)
+                         + retstr; // prepends padding zeros
+                  break;
+    case HEX:     retstr = this.value.toString(16).toUpperCase();
+                  retstr = "$" + zpad.substr(0, 2-retstr.length)
+                         + retstr; // prepends padding zeros
+                  break;
+    case NAT:     retstr = this.value.toString();
+                  retstr = spad.substr(0, 3-retstr.length)
+                         + retstr; // prepends padding spaces
+                  break;
+    case DEC:     if( this.value < 128 ) {
+                    retstr = "+" + this.value;
+                  } else {
+                    retstr = "-" + (256-this.value);
+                  } // if
+                  retstr = spad.substr(0, 3-retstr.length)
+                         + retstr; // prepends padding spaces
+                  break;
+    case ASC:     if( this.value < 0x20 || this.value > 0x79 ) {
+                    retstr = "'·'"; // non-printable ASCII character
+                  } else {
+                    retstr = "'" + String.fromCharCode(this.value) + "'";
+                  } // if
+                  break;
+    case OPCODE:  retstr = Mnemonic[this.value];
+                  break;
+    case IOPCODE: retstr = Mnemonic[this.value] + "?";
+                  break;
+    case ADDR:    retstr = this.value.toString(16).toUpperCase();
+                  retstr = "@" + zpad.substr(0, 2-retstr.length)
+                         + retstr; // prepends padding zeros
+                  break;
+    case UADDR:   retstr = "@??";
+                  break;
+    default:      retstr = "("+this.value+")";
+  } // switch
+  return retstr;
+} // taggedValue.prototype.toString
+
+taggedValue.prototype.valueOf = function()
+{
+  return this.value;
+} // taggedValue.prototype.valueOf
+
+function symbol( name, taggedval )
+{
+  this.name = name;
+  this.taggedval = taggedval;
+  this.toString = function() {
+    return name+" ("+taggedval.toString()+")";
+  } // toString
+} // symbol
+
+function yaspSetSymbols()
+{
+  SymbolTable = new Array();
+  SymbolTable["JC" ] = new symbol( "JC",  new taggedValue( 0x00, IOPCODE ) );
+  SymbolTable["JNC"] = new symbol( "JNC", new taggedValue( 0x20, IOPCODE ) );
+  SymbolTable["JZ" ] = new symbol( "JZ",  new taggedValue( 0x40, IOPCODE ) );
+  SymbolTable["JNZ"] = new symbol( "JNZ", new taggedValue( 0x60, IOPCODE ) );
+  SymbolTable["OUT"] = new symbol( "OUT", new taggedValue( 0x80, IOPCODE ) );
+  SymbolTable["INP"] = new symbol( "INP", new taggedValue( 0x90, IOPCODE ) );
+  SymbolTable["RQL"] = new symbol( "RQL", new taggedValue( 0xA0, IOPCODE ) );
+  SymbolTable["RQH"] = new symbol( "RQH", new taggedValue( 0xA8, IOPCODE ) );
+  SymbolTable["AKL"] = new symbol( "AKL", new taggedValue( 0xB0, IOPCODE ) );
+  SymbolTable["AKH"] = new symbol( "AKH", new taggedValue( 0xB8, IOPCODE ) );
+  SymbolTable["ROL"] = new symbol( "ROL", new taggedValue( 0xC0, OPCODE  ) );
+  SymbolTable["ROR"] = new symbol( "ROR", new taggedValue( 0xC1, OPCODE  ) );
+  SymbolTable["RCL"] = new symbol( "RCL", new taggedValue( 0xC2, OPCODE  ) );
+  SymbolTable["RCR"] = new symbol( "RCR", new taggedValue( 0xC3, OPCODE  ) );
+  SymbolTable["SHL"] = new symbol( "SHL", new taggedValue( 0xC4, OPCODE  ) );
+  SymbolTable["SHR"] = new symbol( "SHR", new taggedValue( 0xC5, OPCODE  ) );
+  SymbolTable["SCL"] = new symbol( "SCL", new taggedValue( 0xC6, OPCODE  ) );
+  SymbolTable["SCR"] = new symbol( "SCR", new taggedValue( 0xC7, OPCODE  ) );
+  SymbolTable["CLC"] = new symbol( "CLC", new taggedValue( 0xC8, OPCODE  ) );
+  SymbolTable["STC"] = new symbol( "STC", new taggedValue( 0xC9, OPCODE  ) );
+  SymbolTable["NOT"] = new symbol( "NOT", new taggedValue( 0xCA, OPCODE  ) );
+  SymbolTable["NEG"] = new symbol( "NEG", new taggedValue( 0xCB, OPCODE  ) );
+  SymbolTable["INA"] = new symbol( "INA", new taggedValue( 0xCC, OPCODE  ) );
+  SymbolTable["DCA"] = new symbol( "DCA", new taggedValue( 0xCD, OPCODE  ) );
+  SymbolTable["INX"] = new symbol( "INX", new taggedValue( 0xCE, OPCODE  ) );
+  SymbolTable["DCX"] = new symbol( "DCX", new taggedValue( 0xCF, OPCODE  ) );
+  SymbolTable["LDA"] = new symbol( "LDA", new taggedValue( 0xD0, IOPCODE ) );
+  SymbolTable["LDX"] = new symbol( "LDX", new taggedValue( 0xD4, IOPCODE ) );
+  SymbolTable["STA"] = new symbol( "STA", new taggedValue( 0xD8, IOPCODE ) );
+  SymbolTable["TAX"] = new symbol( "TAX", new taggedValue( 0xDB, OPCODE  ) );
+  SymbolTable["STX"] = new symbol( "STX", new taggedValue( 0xDC, IOPCODE ) );
+  SymbolTable["TXA"] = new symbol( "TXA", new taggedValue( 0xDF, OPCODE  ) );
+  SymbolTable["TST"] = new symbol( "TST", new taggedValue( 0xE0, IOPCODE ) );
+  SymbolTable["AND"] = new symbol( "AND", new taggedValue( 0xE4, IOPCODE ) );
+  SymbolTable["XOR"] = new symbol( "XOR", new taggedValue( 0xE8, IOPCODE ) );
+  SymbolTable["OR" ] = new symbol( "OR",  new taggedValue( 0xEC, IOPCODE ) );
+  SymbolTable["CMP"] = new symbol( "CMP", new taggedValue( 0xF0, IOPCODE ) );
+  SymbolTable["SUB"] = new symbol( "SUB", new taggedValue( 0xF4, IOPCODE ) );
+  SymbolTable["ADD"] = new symbol( "ADD", new taggedValue( 0xF8, IOPCODE ) );
+  SymbolTable["JMP"] = new symbol( "JMP", new taggedValue( 0xFC, IOPCODE ) );
+  SymbolTable["HLT"] = new symbol( "HLT", new taggedValue( 0xFF, OPCODE  ) );
+} // yaspSetSymbols
+
+var c = 0;
+Mnemonic[c++] = "JC +00";  Mnemonic[c++] = "JC +01";
+Mnemonic[c++] = "JC +02";  Mnemonic[c++] = "JC +03";
+Mnemonic[c++] = "JC +04";  Mnemonic[c++] = "JC +05";
+Mnemonic[c++] = "JC +06";  Mnemonic[c++] = "JC +07";
+Mnemonic[c++] = "JC +08";  Mnemonic[c++] = "JC +09";
+Mnemonic[c++] = "JC +10";  Mnemonic[c++] = "JC +11";
+Mnemonic[c++] = "JC +12";  Mnemonic[c++] = "JC +13";
+Mnemonic[c++] = "JC +14";  Mnemonic[c++] = "JC +15";
+Mnemonic[c++] = "JC -16";  Mnemonic[c++] = "JC -15";
+Mnemonic[c++] = "JC -14";  Mnemonic[c++] = "JC -13";
+Mnemonic[c++] = "JC -12";  Mnemonic[c++] = "JC -11";
+Mnemonic[c++] = "JC -10";  Mnemonic[c++] = "JC -09";
+Mnemonic[c++] = "JC -08";  Mnemonic[c++] = "JC -07";
+Mnemonic[c++] = "JC -06";  Mnemonic[c++] = "JC -05";
+Mnemonic[c++] = "JC -04";  Mnemonic[c++] = "JC -03";
+Mnemonic[c++] = "JC -02";  Mnemonic[c++] = "JC -01";
+Mnemonic[c++] = "JNC +00"; Mnemonic[c++] = "JNC +01";
+Mnemonic[c++] = "JNC +02"; Mnemonic[c++] = "JNC +03";
+Mnemonic[c++] = "JNC +04"; Mnemonic[c++] = "JNC +05";
+Mnemonic[c++] = "JNC +06"; Mnemonic[c++] = "JNC +07";
+Mnemonic[c++] = "JNC +08"; Mnemonic[c++] = "JNC +09";
+Mnemonic[c++] = "JNC +10"; Mnemonic[c++] = "JNC +11";
+Mnemonic[c++] = "JNC +12"; Mnemonic[c++] = "JNC +13";
+Mnemonic[c++] = "JNC +14"; Mnemonic[c++] = "JNC +15";
+Mnemonic[c++] = "JNC -16"; Mnemonic[c++] = "JNC -15";
+Mnemonic[c++] = "JNC -14"; Mnemonic[c++] = "JNC -13";
+Mnemonic[c++] = "JNC -12"; Mnemonic[c++] = "JNC -11";
+Mnemonic[c++] = "JNC -10"; Mnemonic[c++] = "JNC -09";
+Mnemonic[c++] = "JNC -08"; Mnemonic[c++] = "JNC -07";
+Mnemonic[c++] = "JNC -06"; Mnemonic[c++] = "JNC -05";
+Mnemonic[c++] = "JNC -04"; Mnemonic[c++] = "JNC -03";
+Mnemonic[c++] = "JNC -02"; Mnemonic[c++] = "JNC -01";
+Mnemonic[c++] = "JZ +00";  Mnemonic[c++] = "JZ +01";
+Mnemonic[c++] = "JZ +02";  Mnemonic[c++] = "JZ +03";
+Mnemonic[c++] = "JZ +04";  Mnemonic[c++] = "JZ +05";
+Mnemonic[c++] = "JZ +06";  Mnemonic[c++] = "JZ +07";
+Mnemonic[c++] = "JZ +08";  Mnemonic[c++] = "JZ +09";
+Mnemonic[c++] = "JZ +10";  Mnemonic[c++] = "JZ +11";
+Mnemonic[c++] = "JZ +12";  Mnemonic[c++] = "JZ +13";
+Mnemonic[c++] = "JZ +14";  Mnemonic[c++] = "JZ +15";
+Mnemonic[c++] = "JZ -16";  Mnemonic[c++] = "JZ -15";
+Mnemonic[c++] = "JZ -14";  Mnemonic[c++] = "JZ -13";
+Mnemonic[c++] = "JZ -12";  Mnemonic[c++] = "JZ -11";
+Mnemonic[c++] = "JZ -10";  Mnemonic[c++] = "JZ -09";
+Mnemonic[c++] = "JZ -08";  Mnemonic[c++] = "JZ -07";
+Mnemonic[c++] = "JZ -06";  Mnemonic[c++] = "JZ -05";
+Mnemonic[c++] = "JZ -04";  Mnemonic[c++] = "JZ -03";
+Mnemonic[c++] = "JZ -02";  Mnemonic[c++] = "JZ -01";
+Mnemonic[c++] = "JNZ +00"; Mnemonic[c++] = "JNZ +01";
+Mnemonic[c++] = "JNZ +02"; Mnemonic[c++] = "JNZ +03";
+Mnemonic[c++] = "JNZ +04"; Mnemonic[c++] = "JNZ +05";
+Mnemonic[c++] = "JNZ +06"; Mnemonic[c++] = "JNZ +07";
+Mnemonic[c++] = "JNZ +08"; Mnemonic[c++] = "JNZ +09";
+Mnemonic[c++] = "JNZ +10"; Mnemonic[c++] = "JNZ +11";
+Mnemonic[c++] = "JNZ +12"; Mnemonic[c++] = "JNZ +13";
+Mnemonic[c++] = "JNZ +14"; Mnemonic[c++] = "JNZ +15";
+Mnemonic[c++] = "JNZ -16"; Mnemonic[c++] = "JNZ -15";
+Mnemonic[c++] = "JNZ -14"; Mnemonic[c++] = "JNZ -13";
+Mnemonic[c++] = "JNZ -12"; Mnemonic[c++] = "JNZ -11";
+Mnemonic[c++] = "JNZ -10"; Mnemonic[c++] = "JNZ -09";
+Mnemonic[c++] = "JNZ -08"; Mnemonic[c++] = "JNZ -07";
+Mnemonic[c++] = "JNZ -06"; Mnemonic[c++] = "JNZ -05";
+Mnemonic[c++] = "JNZ -04"; Mnemonic[c++] = "JNZ -03";
+Mnemonic[c++] = "JNZ -02"; Mnemonic[c++] = "JNZ -01";
+Mnemonic[c++] = "OUT 00";  Mnemonic[c++] = "OUT 01";
+Mnemonic[c++] = "OUT 02";  Mnemonic[c++] = "OUT 03";
+Mnemonic[c++] = "OUT 04";  Mnemonic[c++] = "OUT 05";
+Mnemonic[c++] = "OUT 06";  Mnemonic[c++] = "OUT 07";
+Mnemonic[c++] = "OUT 08";  Mnemonic[c++] = "OUT 09";
+Mnemonic[c++] = "OUT 10";  Mnemonic[c++] = "OUT 11";
+Mnemonic[c++] = "OUT 12";  Mnemonic[c++] = "OUT 13";
+Mnemonic[c++] = "OUT 14";  Mnemonic[c++] = "OUT 15";
+Mnemonic[c++] = "INP 00";  Mnemonic[c++] = "INP 01";
+Mnemonic[c++] = "INP 02";  Mnemonic[c++] = "INP 03";
+Mnemonic[c++] = "INP 04";  Mnemonic[c++] = "INP 05";
+Mnemonic[c++] = "INP 06";  Mnemonic[c++] = "INP 07";
+Mnemonic[c++] = "INP 08";  Mnemonic[c++] = "INP 09";
+Mnemonic[c++] = "INP 10";  Mnemonic[c++] = "INP 11";
+Mnemonic[c++] = "INP 12";  Mnemonic[c++] = "INP 13";
+Mnemonic[c++] = "INP 14";  Mnemonic[c++] = "INP 15";
+Mnemonic[c++] = "RQL 0";   Mnemonic[c++] = "RQL 1";
+Mnemonic[c++] = "RQL 2";   Mnemonic[c++] = "RQL 3";
+Mnemonic[c++] = "RQL 4";   Mnemonic[c++] = "RQL 5";
+Mnemonic[c++] = "RQL 6";   Mnemonic[c++] = "RQL 7";
+Mnemonic[c++] = "RQH 0";   Mnemonic[c++] = "RQH 1";
+Mnemonic[c++] = "RQH 2";   Mnemonic[c++] = "RQH 3";
+Mnemonic[c++] = "RQH 4";   Mnemonic[c++] = "RQH 5";
+Mnemonic[c++] = "RQH 6";   Mnemonic[c++] = "RQH 7";
+Mnemonic[c++] = "AKL 0";   Mnemonic[c++] = "AKL 1";
+Mnemonic[c++] = "AKL 2";   Mnemonic[c++] = "AKL 3";
+Mnemonic[c++] = "AKL 4";   Mnemonic[c++] = "AKL 5";
+Mnemonic[c++] = "AKL 6";   Mnemonic[c++] = "AKL 7";
+Mnemonic[c++] = "AKH 0";   Mnemonic[c++] = "AKH 1";
+Mnemonic[c++] = "AKH 2";   Mnemonic[c++] = "AKH 3";
+Mnemonic[c++] = "AKH 4";   Mnemonic[c++] = "AKH 5";
+Mnemonic[c++] = "AKH 6";   Mnemonic[c++] = "AKH 7";
+Mnemonic[c++] = "ROL";     Mnemonic[c++] = "ROR";
+Mnemonic[c++] = "RCL";     Mnemonic[c++] = "RCR";
+Mnemonic[c++] = "SHL";     Mnemonic[c++] = "SHR";
+Mnemonic[c++] = "SCL";     Mnemonic[c++] = "SCR";
+Mnemonic[c++] = "CLC";     Mnemonic[c++] = "STC";
+Mnemonic[c++] = "NOT";     Mnemonic[c++] = "NEG";
+Mnemonic[c++] = "INA";     Mnemonic[c++] = "DCA";
+Mnemonic[c++] = "INX";     Mnemonic[c++] = "DCX";
+Mnemonic[c++] = "LDA";     Mnemonic[c++] = "LDA ,X";
+Mnemonic[c++] = "LDA *";   Mnemonic[c++] = "LDA #";
+Mnemonic[c++] = "LDX";     Mnemonic[c++] = "LDX ,X";
+Mnemonic[c++] = "LDX *";   Mnemonic[c++] = "LDX #";
+Mnemonic[c++] = "STA";     Mnemonic[c++] = "STA ,X";
+Mnemonic[c++] = "STA *";   Mnemonic[c++] = "TAX";
+Mnemonic[c++] = "STX";     Mnemonic[c++] = "STX ,X";
+Mnemonic[c++] = "STX *";   Mnemonic[c++] = "TXA";
+Mnemonic[c++] = "TST";     Mnemonic[c++] = "TST ,X";
+Mnemonic[c++] = "TST *";   Mnemonic[c++] = "TST #";
+Mnemonic[c++] = "AND";     Mnemonic[c++] = "AND ,X";
+Mnemonic[c++] = "AND *";   Mnemonic[c++] = "AND #";
+Mnemonic[c++] = "XOR";     Mnemonic[c++] = "XOR ,X";
+Mnemonic[c++] = "XOR *";   Mnemonic[c++] = "XOR #";
+Mnemonic[c++] = "OR ";     Mnemonic[c++] = "OR ,X";
+Mnemonic[c++] = "OR *";    Mnemonic[c++] = "OR #";
+Mnemonic[c++] = "CMP";     Mnemonic[c++] = "CMP ,X";
+Mnemonic[c++] = "CMP *";   Mnemonic[c++] = "CMP #";
+Mnemonic[c++] = "SUB";     Mnemonic[c++] = "SUB ,X";
+Mnemonic[c++] = "SUB *";   Mnemonic[c++] = "SUB #";
+Mnemonic[c++] = "ADD";     Mnemonic[c++] = "ADD ,X";
+Mnemonic[c++] = "ADD *";   Mnemonic[c++] = "ADD #";
+Mnemonic[c++] = "JMP";     Mnemonic[c++] = "JMP ,X";
+Mnemonic[c++] = "JMP *";   Mnemonic[c++] = "HLT";
+
+// Memory entry
+function memEntry( srcline, label, BP, tv )
+{ 
+  this.srcline = srcline; // from 1 to n, 0 means "no line"
+  this.label = label; 
+  this.bp = BP;
+  this.tagval = tv;
+} // memEntry
+
+
+///////////////////////////////////////////////////////////////////////////////
+// YASP processor data:
+///////////////////////////////////////////////////////////////////////////////
+
+var memory = new Array();
+for( addr = 0; addr < 256; ++addr ) {
+  memory[addr] = new memEntry( 0, "", false, new taggedValue( 0, BIN ) );
+} // for
+
+var regPCpre = 0;
+var regPC  = 0;
+var regA   = 0;
+var regX   = 0;
+var regMB  = 0;
+var regMAR = 0;
+var regIR  = 0;
+var regREQ = parseInt(0);
+var regACK = parseInt(0);
+var flagCarry  = 0;
+var flagZero   = 0;
+
+var portINP = new Array(8);
+var portOUT = new Array(8);
+var portIO  = new Array(8);
+var portIOdir = new Array(8); // "X" = unknown, "I" = input, "O" = output
+for( addr = 0; addr < 8; ++addr ) { // initializing ports
+  portINP[addr]   = 0xFF;
+  portOUT[addr]   = 0x20; // spaces, to have a neat display
+  portIO[addr]    = 0xFF;
+  portIOdir[addr] = "X";
+} // for
+
+///////////////////////////////////////////////////////////////////////////////
+// Assembler functions
+///////////////////////////////////////////////////////////////////////////////
+
+DIRECT    = 0x00;
+INDEXED   = 0x01;
+INDIRECT  = 0x02;
+IMMEDIATE = 0x03;
+
+function yaspILAssemble( pc, line, lc, warn )
+// Parameter 'line' must contain a single instruction line, without comments.
+// Parameter 'lc', from "line count", is optional: when given is used to
+// 1) link source code lines to memory positions, and 
+// 2) in alerts about errors and warnings.
+// On success, modifies memory[pc] and returns next program counter.
+// On error, returns -1.
+{
+  var chunks;
+  var inc;
+  var tv;
+  var labelname, word;
+
+  if( line.indexOf(":") < 0 ) { // there is no label to extract
+    labelname = "";
+  } else {
+    chunks = line.split(/\s*:\s*/);
+    tv = new taggedValue( chunks[0] );
+    word = chunks[0].toUpperCase();
+    if( tv.tag == UNKWN ) { // creates a new symbol for the label
+      tv.tag = ADDR;
+      tv.value = pc;
+      SymbolTable[word] = new symbol( chunks[0], tv );
+      memory[pc].label = word; // word is used as index for SymbolTable
+    } else if( tv.tag == UADDR ) { // changes corresponding symbol to ADDR
+      SymbolTable[word].taggedval.tag = ADDR;
+      SymbolTable[word].taggedval.value = pc;
+      memory[pc].label = word;
+    } else { // it's a constant value!
+      if( warn==null || warn==true ) {
+        alert( "Warning" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+          +    "Constant value " + tv
+          +    " for label changes program counter."
+        ); // alert
+      } // if
+      pc = tv.value.valueOf(); 
+	  } // if-else
+    line = chunks[1].replace(/^\s+/,'');
+  } // if
+  if( lc != null ) {
+    memory[pc].srcline = lc +1;
+  } // if
+  if( line.indexOf("=") < 0 ) { // instruction or data definition
+    if( /^DB\s*\?/i.test(line) ) { // data room reservation
+      pc = (pc + 1) % 256; // increases program counter
+    } else if( /^DB\s+/i.test(line) ) { // data definition
+      line = line.replace(/^DB\s+/i, '');
+      memory[pc].tagval = new taggedValue( line );
+      pc = (pc + 1) % 256; // increases program counter
+    } else { // instruction
+      word = line.match(/^\w+/)[0];
+      tv = new taggedValue( word );
+      if( tv.tag == OPCODE ) { // single-field opcode instructions
+        memory[pc].tagval = tv;
+        pc = (pc + 1) % 256; // increases program counter
+      } else if( tv.tag == IOPCODE ) { // computing additional fields
+        memory[pc].tagval = tv;
+        line = line.substr( word.length ).replace(/^\s+/,'');
+        switch( tv.value ) {
+          case 0x00 :
+          case 0x20 :
+          case 0x40 : // Conditional jumps, with relative addressing
+          case 0x60 : // JC, JNC, JZ, JNZ
+            tv = new taggedValue( line );
+            if( tv.tag == UNKWN ) {  // convert to UADDR and create symbol
+              tv.tag = UADDR;
+              word = line.match(/^\w+/)[0];
+              if( word.length > 0 ) {
+                SymbolTable[word.toUpperCase()] = new symbol( word, tv );
+                memory[pc].bp = true; 
+                pc = (pc + 1) % 256; // increases program counter
+              } else {
+                memory[pc].bp = false; 
+                alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Label or value contains invalid characters."
+                ); // alert
+                pc = -1;
+              } // if
+            } else if( tv.tag == UADDR ) { // 2nd pass
+              memory[pc].bp = true; 
+              pc = (pc + 1) % 256; // increases program counter
+            } else { // check range
+              if( tv.tag == OPCODE || tv.tag == IOPCODE ) { // a bit of advice
+                alert( "Warning" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Opcode from mnemonic used as a constant address."
+                ); // alert
+              } // if
+              memory[pc].bp = false; 
+              inc = tv - pc -1;
+              if( inc > +15 || inc < -16 ) { // out of range
+                alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Conditional jump out of range."
+                ); // alert
+                pc = -1;
+              } else { // updates OPCODE
+                memory[pc].tagval.tag = OPCODE;
+                memory[pc].tagval.value += (inc<0? 32+inc : inc);
+                pc = (pc + 1) % 256; // increases program counter
+              } // if
+            } // else-if 
+            break;
+          case 0x80 : // Input/output, with port addressing
+          case 0x90 : // OUT, INP
+            tv = new taggedValue( line );
+            if( tv.tag!=UNKWN && tv.tag!=UADDR && tv.tag!=ADDR ) { // check range 
+              inc = tv.value;
+              if( inc > +15 || inc < 0 ) { // out of range
+                alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Port address out of range."
+                ); // alert
+                pc = -1;
+              } else { // updates OPCODE
+                memory[pc].tagval.tag = OPCODE;
+                memory[pc].tagval.value += inc;
+                pc = (pc + 1) % 256; // increases program counter
+              } // if
+            } else { 
+              alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                +    (tv.tag==UNKWN? "Unknown or wrong" :
+                     "A memory address cannot be used as a" ) 
+                +    " port address. "
+              ); // alert
+              pc = -1;
+            } // if 
+            break;
+          case 0xA0 :
+          case 0xA8 :
+          case 0xB0 : // Request/ack, with line addressing
+          case 0xB8 : // RQL, RQH, AKL, AKH
+            tv = new taggedValue( line );
+            if( tv.tag!=UNKWN && tv.tag!=UADDR && tv.tag!=ADDR ) { // check range 
+              inc = tv.value;
+              if( inc > +8 || inc < 0 ) { // out of range
+                alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Line address out of range."
+                ); // alert
+                pc = -1;
+              } else { // updates OPCODE
+                memory[pc].tagval.tag = OPCODE;
+                memory[pc].tagval.value += inc;
+                pc = (pc + 1) % 256; // increases program counter
+              } // if
+            } else { 
+              alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                +    (tv.tag==UNKWN? "Unknown or wrong" :
+                     "A memory address cannot be used as a" ) 
+                +    " line address. "
+              ); // alert
+              pc = -1;
+            } // if 
+            break;
+          case 0xD0 : // Register load, with addressing mode
+          case 0xD4 : // LDA, LDX
+          case 0xE0 :
+          case 0xE4 :
+          case 0xE8 :
+          case 0xEC :
+          case 0xF0 :
+          case 0xF4 : // AL operations, with addressing mode
+          case 0xF8 : // TST, AND, XOR, OR, CMP, SUB, ADD
+          case 0xD8 : // Register store, with addressing mode
+          case 0xDC : // STA, STX - immediate forms: TAX, TXA
+          case 0xFC : // JMP - immediate form: HLT
+            memory[pc].bp = false; 
+            inc = DIRECT;
+            if( /^\s*\*/.test(line) ) {
+              inc = INDIRECT;
+              line = line.replace( /^s*\*/, '' );
+            } else if( /^\s*\#/.test(line) ) {
+              inc = IMMEDIATE;
+              line = line.replace( /^s*\#/, '' );
+            } else if( /^\s*[^\,]+\,\s*[xX]/.test(line) ) {
+              inc = INDEXED;
+              line = line.replace( /\,\s*[xX]/, '' );
+            } // else-if
+            memory[pc].tagval.tag = OPCODE;
+            memory[pc].tagval.value += inc;
+            inc = (pc + 1) % 256; // increases program counter
+            if( lc != null ) {
+              memory[inc].srcline = lc +1;
+            } // if
+            tv = new taggedValue( line );
+            if( tv.tag == UNKWN ) {  // convert to UADDR and create symbol
+              tv.tag = UADDR;
+              word = line.match(/^\w+/)[0];
+              if( word.length > 0 ) {
+                SymbolTable[word.toUpperCase()] = new symbol( word, tv );
+                memory[pc].bp = true; 
+              } else {
+                alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Label or value contains invalid characters."
+                ); // alert
+                pc = -1;
+              } // if
+            } else if( tv.tag == UADDR ) { // 2nd pass
+              memory[pc].bp = true; 
+            } else { // address
+              if( tv.tag == OPCODE || tv.tag == IOPCODE ) { // a bit of advice
+                alert( "Warning" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+                  +    "Opcode from mnemonic used as a constant address."
+                ); // alert
+              } // if
+              memory[inc].tagval.tag = ADDR;
+              memory[inc].tagval.value = tv.value;
+            } // else-if 
+            if( pc >= 0 ) {
+              pc = (inc + 1) % 256; // increases program counter
+            } // if
+            break;
+          default:
+            alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+              +    "Cannot determine OPCODE base " + tv.toString( HEX ) + "."
+             ); // alert
+            pc = -1;
+        } // switch
+      } else {
+        alert( "Error" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+          +    "Unrecognized mnemonic '" + name + "'."
+        ); // alert
+        pc = -1;
+      } // if
+    } // if 
+  } else { // symbol definition
+    if( labelname != "" ) {
+      if( warn == null || warn == true ) {
+        alert( "Warning" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+          +    "Label has no effect in symbol definition."
+        ); // alert
+      } // if
+    } // if
+    chunks = line.split(/\s*=\s*/);
+    word = chunks[0].toUpperCase();
+    tv = new taggedValue( chunks[1] );
+    if( SymbolTable[word] ) { // symbol re-definition
+      if( warn == null || warn == true ) {
+        alert( "Warning" + ( lc!=null ? " at line "+lc+":\n" : ":\n")
+          +    "Symbol "+chunks[0]+" has been re-defined."
+        ); // alert
+      } // if
+      SymbolTable[word].taggedval = tv;
+    } else { // new symbol
+      SymbolTable[word] = new symbol( chunks[0], tv );
+    } // if
+  } // if
+  return pc;
+} // yaspILAssemble
+
+var srcLineOffsets = null;
+
+function yaspAssemble()
+{
+  var srccode = document.form1.source.value;
+  var instructs;
+  var c = 0;
+  var vPC = 0; 
+  var phrase;
+  var syntax_error = false;
+  var offset = 0;
+  var i;
+  
+  srcLineOffsets = new Array();
+  if( srccode == "" ) {
+    srcLineOffsets[0] = 0;
+    alert( "Empty source code. Nothing changed!" );
+  } else {
+    for( c=0; c<256; ++c ) { // clears breakpoints, labels & src code refs.
+      memory[c].label = "";
+      memory[c].bp = false;
+      memory[c].srcline = 0;
+    } // for
+    instructs = srccode.split('\n');
+    for( c=0; c<instructs.length; ++c) {
+      instructs[c] = instructs[c].replace(/\r$/,'');
+      srcLineOffsets[c] = offset;
+      offset += instructs[c].length + 1;
+    } // for
+    srcLineOffsets[c] = offset;
+    yaspSetSymbols();
+    c = 0;
+    while( !syntax_error && c<instructs.length ) {
+      phrase = instructs[c].split(';')[0];
+      phrase = phrase.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+      if( phrase.length > 0 ) {
+        vPC = yaspILAssemble( vPC, phrase, c, true );
+        syntax_error = vPC < 0;
+      } // if
+      c = c + 1; // next line @ source code
+    } // while
+    // Check undefined addresses in instructions
+    vPC=0;
+    while( !syntax_error && vPC<256 ) {
+      if( memory[vPC].bp ) {
+        memory[vPC].bp = false;
+        phrase = instructs[memory[vPC].srcline-1].split(';')[0];
+        phrase = phrase.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' ');
+        c = yaspILAssemble( vPC, phrase, memory[vPC].srcline-1, false );
+        if( memory[vPC].bp ) { // label still not defined :-(
+          alert( "Error at line " + memory[vPC].srcline + ":\n"
+            +    "Undefined label."
+          ); // alert
+          c = -1;
+        } // if
+      if( c < 0 ) {
+          syntax_error = true;
+        } // if
+      } // if
+      vPC = vPC + 1;
+    } // while
+  } // if
+  yaspRedrawMem();
+  yaspReset();
+} // yaspAssemble
+
+function yaspCreateMemWindow()
+{
+  var mwFrame = document.getElementById("memframe");
+  var doc = mwFrame.contentDocument;
+  if( doc == undefined || doc == null ) {
+    doc = mwFrame.contentWindow.document;
+  } // if
+  doc.open();
+  doc.writeln("<html><head>");
+  doc.writeln("<style>");
+  doc.writeln(".ta { FONT-WEIGHT:normal; FONT-SIZE:11px; COLOR:#000000;"
+             +" FONT-STYLE:normal; FONT-FAMILY:Verdana; TEXT-DECORATION:none}"
+  ); // writeln
+  doc.writeln(".tb { FONT-WEIGHT:bold; FONT-SIZE:11px; COLOR:#000000;"
+             +" FONT-FAMILY:Verdana}"
+  ); // writeln
+  doc.writeln(".tc { FONT-SIZE:10px; COLOR:#000000; FONT-FAMILY:Verdana;"
+	           +"BACKGROUND-COLOR:#fcfcfc}"
+  ); // writeln
+  doc.writeln(".fb { BORDER-RIGHT:#b5b5b5 1px solid;"
+             +" BORDER-TOP:#b5b5b5 1px solid; FONT-SIZE:11px;"
+             +" BACKGROUND: #cccccc; BORDER-LEFT:#b5b5b5 1px solid;"
+             +" CURSOR:hand; COLOR:#333333; BORDER-BOTTOM:#b5b5b5 1px solid;"
+             +" FONT-FAMILY: Verdana, Arial }"
+  ); // writeln
+  doc.writeln("</style>");
+  doc.writeln("</head><body marginwidth=0 marginheight=0 leftmargin=0 topmargin=0>");
+  doc.writeln("<table bordercolor='#000000' width='217' border='1' cellspacing='0' cellpadding='3'>");
+  for(i=0; i<256; i++) {
+    doc.writeln("<tr align='center' class='ta' id='fm"+i+"'>");
+    doc.writeln("<td width='7' id='b" + i
+      + "'><a href='javascript:void(0);' onClick='javascript:window.parent.yaspToggleBP(" + i
+      + ");' class='ta'>&nbsp;&nbsp;</a></td>"
+    ); // doc.writeln
+    doc.writeln("<td width='22' id='cmn"+i+"'>"+(i<16?"0":"")+i.toString(16).toUpperCase()+"</td>")
+    doc.writeln("<td width='84' id='cme"+i+"'>&nbsp;</td>")
+    doc.writeln("<td width='70' id='cmc" + i
+      + "'><a href='javascript:void(0);' onClick='javascript:window.parent.yaspNewValAt(" + i
+      + ");' class='ta'>%00000000</a></td>"
+    ); // doc.writeln
+    doc.writeln("</tr>");
+  } // for 
+  doc.writeln("</table>");
+  doc.writeln("</body></html>");
+  doc.close();
+  // document.all.memframe.style.visibility="visible";
+} // yaspCreateMemWindow
+
+function yaspDump()
+{
+  var addr = 0;
+  var memstr = "' Memory dump in Parallax PBASIC";
+  var win, doc;
+	
+  for( addr = 0; addr < 256; ++addr ) {
+    if( addr == 0 ) {
+      memstr += "<br>\nymem DATA ";
+    } else if( addr % 8 == 0 ) {
+      memstr += "<br>\n&nbsp;&nbsp;&nbsp;&nbsp;     DATA ";
+    } else {
+      memstr += ", ";
+    } // else-if
+    memstr += memory[addr].tagval.toString(HEX);
+  } // for
+  memstr += "<br>\n'end of memory dump<br>\n";
+  win = window.open( "", "MEMORY_DUMP",
+      "toolbar=no, scrollbars=yes, location=no, statusbar=yes, menubar=yes, "+
+      "resizable=yes, width=480, height=720"
+  );
+  win.document.write("<html><head><title>YASP Memory Dump</title></head>");
+  win.document.write("<body style=\"font-family: Courier; font-size:10pt\"\n");
+  win.document.write(" onUnLoad='alert(\"jsYASP must be re-loaded to get this window again\")'\">");
+  win.document.write( memstr );
+  win.document.write( "</body></html>\n" );    
+  win.document.close();
+} // yaspDump
+
+function yaspRedrawMem()
+// Memory window update
+{
+  var vPC;
+  var ceactual;
+  var cmactual;
+	
+  for( vPC=0; vPC<256; vPC++ ) {
+    ceactual = "cme" + vPC;
+    cmactual = "cmc" + vPC;
+    if( memory[vPC].label != "" ) {
+      window.memframe.document.getElementById(ceactual).innerHTML
+      = SymbolTable[memory[vPC].label].name+":";
+    } // if
+    window.memframe.document.getElementById(cmactual).innerHTML
+    = "<a href='javascript:void(0);' onClick='javascript:window.parent.yaspNewValAt("
+      + vPC + ");' class='ta'>" + memory[vPC].tagval.toString() + "</a>";
+  } // for
+} // yaspRedrawMem
+
+var lastScrollTop = 0;
+
+function yaspScrollMem()
+{
+  var gap = regPC - lastScrollTop;
+
+  if( gap > 7 ) {
+    lastScrollTop = regPC;
+  } else if( gap < -7 ) {
+    lastScrollTop = regPC;
+  } // if-else
+  window.memframe.scrollTo(0, lastScrollTop*21);
+} // yaspScrollMem
+
+function yaspSrcSelect( lineno )
+// Selects text at the source code textarea 
+{
+  var e = document.getElementById('source');
+  var start_pos;
+  var end_pos;
+
+  if( lineno > 0 ) {
+    lineno = lineno -1;
+    start_pos = srcLineOffsets[lineno];
+    end_pos = srcLineOffsets[lineno+1]-1;
+    if( 'selectionStart' in e ) { // Mozilla and DOM 3.0
+      e.selectionStart = start_pos;
+      e.selectionEnd = end_pos;
+      e.focus();
+      if( /Microsoft/i.test(navigator.appName) ) {
+        e.scrollTop = Math.floor( lineno * e.scrollHeight / srcLineOffsets.length );
+      } // if
+    } else if( document.selection ) { // IE <9.0
+      var tr = e.createTextRange();
+      tr.moveEnd('textedit',-1);
+      tr.moveStart('character',start_pos);
+      tr.moveEnd('character',end_pos - start_pos);
+      tr.select();
+      e.scrollTop = Math.floor( lineno * e.scrollHeight / srcLineOffsets.length );
+      e.focus();
+    } // if-else
+  } // if
+} // yaspSrcSelect
+
+function yaspHighlightRows()
+// Highlights regPC memory row and corresponding source code line
+// Uses regPC and regPCpre
+{
+  var color = window.memframe.document.getElementById("b"+regPCpre).style.backgroundColor;
+
+  if(!(color.toUpperCase()=="#FF0000") && !(color=="rgb(255, 0, 0)")) { 
+    window.memframe.document.getElementById("b"+regPCpre).style.backgroundColor="#FFFFFF";
+  } // if
+  window.memframe.document.getElementById("cmn"+regPCpre).style.backgroundColor="#FFFFFF";
+  window.memframe.document.getElementById("cme"+regPCpre).style.backgroundColor="#FFFFFF";
+  window.memframe.document.getElementById("cmc"+regPCpre).style.backgroundColor="#FFFFFF";
+
+  color=window.memframe.document.getElementById("b"+regPC).style.backgroundColor;
+  if(!(color.toUpperCase()=="#FF0000") && !(color=="rgb(255, 0, 0)")) { 
+    window.memframe.document.getElementById("b"+regPC).style.backgroundColor="#0066CC";
+  } // if
+  window.memframe.document.getElementById("cmn"+regPC).style.backgroundColor="#0066CC";
+  window.memframe.document.getElementById("cme"+regPC).style.backgroundColor="#0066CC";
+  window.memframe.document.getElementById("cmc"+regPC).style.backgroundColor="#0066CC";
+
+  if( memory[regPC].srcline > 0 ) {
+    yaspSrcSelect( memory[regPC].srcline );  
+  } // if
+
+} // yaspHighlightRows
+
+var TmpTV = new taggedValue( 0, BIN ); // Auxiliary value for yaspUpdate<register>
+
+function yaspUpdateA()
+{
+  TmpTV.value = regA;
+  document.getElementById('rad').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('ras').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('rab').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('rah').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('rac').innerHTML = TmpTV.toString( ASC );
+} // yaspUpdateA
+
+function yaspUpdateX()
+{
+  TmpTV.value = regX;
+  document.getElementById('rxd').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('rxs').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('rxb').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('rxh').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('rxc').innerHTML = TmpTV.toString( ASC );
+} // yaspUpdateX
+
+function yaspUpdatePC()
+{
+  TmpTV.value = regPC;
+  document.getElementById('pcd').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('pcs').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('pcb').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('pch').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('pcc').innerHTML = TmpTV.toString( ASC );
+  yaspHighlightRows();
+  regPCpre = regPC;
+  yaspScrollMem();
+} // yaspUpdatePC
+
+function yaspUpdateMB()
+{
+  TmpTV.value = regMB;
+  document.getElementById('mbd').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('mbs').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('mbb').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('mbh').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('mbc').innerHTML = TmpTV.toString( ASC );
+} // yaspUpdateMB
+
+function yaspUpdateMAR()
+{
+  TmpTV.value = regMAR;
+  document.getElementById('mard').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('mars').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('marb').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('marh').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('marc').innerHTML = TmpTV.toString( ASC );
+} // yaspUpdateMAR
+
+function yaspUpdateIR()
+{
+  TmpTV.value = regIR;
+  document.getElementById('irdi').innerHTML = TmpTV.toString( NAT );
+  document.getElementById('irsi').innerHTML = TmpTV.toString( DEC );
+  document.getElementById('irbi').innerHTML = TmpTV.toString( BIN ).substr(1);
+  document.getElementById('irhi').innerHTML = TmpTV.toString( HEX ).substr(1);
+  document.getElementById('irci').innerHTML = TmpTV.toString( ASC );
+  document.getElementById('irbo').innerHTML = TmpTV.toString( OPCODE );
+  if( (regIR&0xF0) > 0xC0  && // 2-byte opcode but TAX, TXA, HLT
+      (regIR&0xFF) != 0xDB && (regIR&0xFF) != 0xDF && (regIR&0xFF) != 0xFF
+  ) { // two-byte instruction
+    TmpTV.value = memory[regPC].tagval.value;
+    document.getElementById('irdo').innerHTML = TmpTV.toString( NAT );
+    document.getElementById('irso').innerHTML = TmpTV.toString( DEC );
+    document.getElementById('irho').innerHTML = TmpTV.toString( HEX ).substr(1);
+    document.getElementById('irco').innerHTML = TmpTV.toString( ASC );
+  } else { // single-byte instruction
+    document.getElementById('irdo').innerHTML = "&nbsp;";
+    document.getElementById('irso').innerHTML = "&nbsp;";
+    document.getElementById('irho').innerHTML = "&nbsp;";
+    document.getElementById('irco').innerHTML = "&nbsp;";
+  } // if
+} // yaspUpdateIR
+
+function yaspUpdateINP( num )
+{
+  if( num < 8 ) {
+    TmpTV.value = portINP[num];
+    document.getElementById( "prt" + num + "i" ).innerHTML =
+      TmpTV.toString( HEX ).substr(1);
+  } else {
+    TmpTV.value = portIO[num-8];
+    document.getElementById( "prt" + num ).innerHTML =
+      TmpTV.toString( HEX ).substr(1);
+  } // if
+} // yaspUpdateINP
+
+function yaspUpdateOUT( num )
+{
+  if( num < 8 ) {
+    TmpTV.value = portOUT[num];
+    document.getElementById( "prt" + num + "o" ).innerHTML =
+      TmpTV.toString( HEX ).substr(1);
+    document.getElementById( "display" + num ).innerHTML =
+      TmpTV.toString( ASC ).substr(1, 1);
+  } else {
+    TmpTV.value = portIO[num-8];
+    document.getElementById( "prt" + num ).innerHTML =
+      TmpTV.toString( HEX ).substr(1);
+  } // if
+} // yaspUpdateOUT
+
+function yaspUpdateCarry()
+{
+  document.getElementById('carry').innerHTML = flagCarry? 1 : 0;
+} // yaspUpdateCarry
+
+function yaspUpdateZero()
+{
+  document.getElementById('zero').innerHTML = flagZero? 1 : 0;
+} // yaspUpdateZero
+
+function yaspUpdateACK()
+{
+  var tmpACK = regACK;
+  var cBox = null;
+	
+  for( i=0; i<8; ++i ) {
+    cBox = document.getElementById( "ack" + (7-i) );
+    if( cBox.value > tmpACK ) {
+      cBox.checked = false;
+    } else {
+      tmpACK -= cBox.value;
+      cBox.checked = true;
+    } // if
+  } // for
+} // yaspUpdateACK
+
+function yaspUpdateREQ()
+{
+  var tmpREQ = regREQ;
+  var cBox = null;
+
+  for( i=0; i<8; ++i ) {
+    cBox = document.getElementById( "req" + (7-i) );
+    if( cBox.value > tmpREQ ) {
+      cBox.checked = false;
+    } else {
+      tmpREQ -= cBox.value;
+      cBox.checked = true;
+    } // if
+  } // for
+} // yaspUpdateREQ
+
+
+// ----------------------------------
+// To enable communication by cookies
+// ----------------------------------
+
+function getCookie( NameOfCookie )
+{
+  if (document.cookie.length > 0) { 
+    begin = document.cookie.indexOf(NameOfCookie+"=");
+    if (begin != -1) { 
+      begin += NameOfCookie.length+1;
+      end = document.cookie.indexOf(";", begin);
+      if (end == -1) {
+        end = document.cookie.length;
+      }
+      return unescape(document.cookie.substring(begin,end));
+    } else {
+      return null;
+    }
+  } else {
+    return null;
+  }
+} // getCookie
+
+function setCookie( NameOfCookie, value )
+{
+  // var ExpireDate = new Date();
+  // ExpireDate.setTime(ExpireDate.getTime() + (7 * 24 * 3600 * 1000));
+  // 7 days * 24 hour/day * 3600 sec/hour * 1000 mSec/Sec
+  document.cookie = NameOfCookie + "=" + escape(value);
+  //  + "; expires=" + ExpireDate.toGMTString();
+} // setCookie
+
+function delCookie( NameOfCookie )
+{
+  setCookie( NameOfCookie, "none" );
+} // delCookie
+
+function removeCookie( NameOfCookie )
+{
+  if( getCookie( NameOfCookie ) ) {
+    document.cookie = NameOfCookie + "=" +
+    "; expires=Thu, 01-Jan-70 00:00:01 GMT";
+  } // if
+} // removeCookie
+
+function hexStringOf( b )
+{
+  var hex_digit = "0123456789ABCDEF";
+  var str = hex_digit.charAt( b&0x0F );
+  b = (b&0xF0) >>> 4;
+  return hex_digit.charAt( b ) + str;
+} // hexStringOf
+
+function yaspGetPortsAndAck()
+{
+  var cookieName = "yasp";
+  var cookieVal = "";
+  if( yaspChannelEnd != "none"  ) {
+    cookieName += ( yaspChannelEnd.charAt(4)=='A'? "B" : "A" );
+    cookieVal = getCookie( cookieName );
+    if( cookieVal && cookieVal != "none" ) {
+      for( i=0; i<8; ++i ) {
+        portINP[i] = parseInt( cookieVal.substring( 2*i, 2*i+2 ), 16 )
+      } // for
+      for( i=0; i<8; ++i ) {
+        portString = cookieVal.substring( 2*i+16, 2*i+18 );
+        if( portString!="XX" ) portIO[i] = parseInt( portString, 16 )
+      } // for 
+      regACK = parseInt( cookieVal.substring(32,34), 16 )
+    } // if
+  } // if  
+  yaspUpdateACK();
+} // yaspGetPortsAndAck
+
+function yaspSetPortsAndReq()
+{
+  var cookieVal = "";
+  if( yaspChannelEnd != "none"  ) {
+    for( i=0; i<8; ++i ) cookieVal += hexStringOf( portOUT[i] ); 
+    for( i=0; i<8; ++i ) {
+      if( portIOdir[i] == "O" ) cookieVal += hexStringOf( portIO[i] )
+      else cookieVal += "XX"
+    }
+    cookieVal += hexStringOf( regREQ );
+    setCookie( yaspChannelEnd, cookieVal )
+  } // if  
+} // yaspSetPortsAndReq
+
+
+//
+// GUI event service functions:
+//
+
+function yaspNewValAt( pc )
+{
+  var line = prompt( "Input new value or assembly instruction\n"
+               + "at memory address $"+pc.toString(16).toUpperCase(), ""
+             ); // prompt
+  var chunks, tv;
+  var labelname, word;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    if( line.indexOf(":") < 0 ) { // there is no label to extract
+      labelname = "";
+    } else {
+      chunks = line.split(/\s*:\s*/);
+      tv = new taggedValue( chunks[0] );
+      word = chunks[0].toUpperCase();
+      if( tv.tag == UNKWN ) { // creates a new symbol for the label
+        tv.tag = ADDR;
+        tv.value = pc;
+        SymbolTable[word] = new symbol( chunks[0], tv );
+        memory[pc].label = word; // word is used as index for SymbolTable
+      } else if( tv.tag == UADDR ) { // changes corresponding symbol to ADDR
+        SymbolTable[word].taggedval.tag = ADDR;
+        SymbolTable[word].taggedval.value = pc;
+        memory[pc].label = word;
+      } else { // it's a constant value!
+        alert( "Warning:\n"
+          +    "Constant value " + tv
+          +    " for label changes program counter."
+        ); // alert
+        pc = tv.value.valueOf();
+      } // if-else
+      line = chunks[1].replace(/^\s+/,'');
+    } // if
+    // Is it a value or an assembler line?
+    tv = new taggedValue( line );
+    if(  tv.tag == BIN || tv.tag == HEX || tv.tag == NAT || tv.tag == DEC
+      || tv.tag == ASC || tv.tag == ADDR ) {
+      memory[pc].tagval = tv;
+    } else {
+      pc = yaspILAssemble( pc, line, null, true );
+    } // if
+  } // if
+  yaspRedrawMem();
+} // yaspNewValAt()
+
+function yaspFetch()
+// Updates regIR and regMAR
+// Increases regPC
+{
+  regMAR = regPC;                       // MAR <-- <PC>  
+  regMB  = memory[regMAR].tagval.value; // MB <-- <<MAR>> { read }
+  regPC  = regPC + 1;                   // PC <-- <PC> + 1  
+  regIR  = regMB; regMAR = regMB;       // IR, MAR <-- <MB>  
+  yaspUpdateMAR();
+  yaspUpdateMB();
+  yaspUpdatePC();
+  yaspUpdateIR();
+} // yaspFetch
+
+function yaspLdAddr()
+{
+  // reads 2nd. byte
+  regMAR = regPC;                           // MAR <-- <PC>  
+  regMB  = memory[regMAR].tagval.value;     // MB <-- <<MAR>> { read }
+  regPC  = regPC + 1;                       // PC <-- <PC> + 1  
+  switch( regIR & 0x03 ) {
+    case INDIRECT:
+      regMAR = regMB;                       // MAR <-- <MB>  
+      regMB  = memory[regMAR].tagval.value; // MB <-- <<MAR>> { read }
+    case DIRECT:
+      regMAR = regMB;                       // MAR <-- <MB>  
+      break;
+    case INDEXED:
+      regMB = regMB + regX;                 // MAR, MB <-- <MB> + <X>  
+      regMAR = regMB;                       // { included in previous microinst. } 
+      break;
+    // case IMMEDIATE: { no 'immediate' addresses are possible }
+  } // switch
+  yaspUpdateMAR();
+  yaspUpdateMB();
+  yaspUpdatePC();
+} // yaspLdAddr
+
+function yaspxJC()
+{
+  var rel = 0;
+  if( flagCarry == 1 ) {
+    rel = regIR & 0x1F;
+    if( rel > 15 ) { // if negative
+      rel = rel - 32;
+    } // if 
+    regPC = regPC + rel;                    // PC <-- <PC> + <IR[4..0]>
+  } // if
+  yaspUpdatePC();
+} // yaspxJC
+
+function yaspxJNC()
+{
+  var rel = 0;
+  if( flagCarry == 0 ) {
+    rel = regIR & 0x1F;
+    if( rel > 15 ) { // if negative
+      rel = rel - 32;
+    } // if 
+    regPC = regPC + rel;                    // PC <-- <PC> + <IR[4..0]>
+  } // if
+  yaspUpdatePC();
+} // yaspxJNC
+
+function yaspxJZ()
+{
+  var rel = 0;
+  if( flagZero == 1 ) {
+    rel = regIR & 0x1F;
+    if( rel > 15 ) { // if negative
+      rel = rel - 32;
+    } // if 
+    regPC = regPC + rel;                    // PC <-- <PC> + <IR[4..0]>
+  } // if
+  yaspUpdatePC();
+} // yaspxJZ
+
+function yaspxJNZ()
+{
+  var rel = 0;
+  if( flagZero == 0 ) {
+    rel = regIR & 0x1F;
+    if( rel > 15 ) { // if negative
+      rel = rel - 32;
+    } // if 
+    regPC = regPC + rel;                    // PC <-- <PC> + <IR[4..0]>
+  } // if
+  yaspUpdatePC();
+} // yaspxJNZ
+
+function yaspxOUT()
+{
+  var port = regIR & 0x0F;
+
+  if( port < 8 ) { // output-only ports
+    portOUT[port] = regA;                   // Output[port] <-- <A>
+  } else { // input-output ports
+    portIO[port-8] = regA;                  // I/O[port] <-- <A>
+    portIOdir[port-8] = 'O';
+  } // if
+  yaspUpdateOUT( port );
+  yaspSetPortsAndReq();
+} // yaspxOUT
+
+function yaspxINP()
+{
+  var port = regIR & 0x0F;
+
+  yaspGetPortsAndAck();
+  if( port < 8 ) { // input-only ports
+    regA = portINP[port];                   // Output[port] <-- <A>
+  } else { // input-output ports
+    regA = portIO[port-8];                  // I/O[port] <-- <A>
+    portIOdir[port-8] = 'I';
+  } // if
+  yaspUpdateINP( port );
+  yaspUpdateA();
+} // yaspxINP
+
+function yaspxRQL()
+{
+  var laddr = regIR & 0x07;
+  var baddr = 0x01;
+
+  while( laddr > 0 ) {
+    laddr = laddr -1;
+    baddr <<= 1;
+  } // while
+  regREQ &= ~baddr;                         // REQ[laddr] <-- 0
+  yaspUpdateREQ();
+  yaspSetPortsAndReq();
+} // yaspxRQL
+
+function yaspxRQH()
+{
+  var laddr = regIR & 0x07;
+  var baddr = 0x01;
+
+  while( laddr > 0 ) {
+    laddr = laddr -1;
+    baddr <<= 1;
+  } // while
+  regREQ |= baddr;                          // REQ[laddr] <-- 1
+  yaspUpdateREQ();
+  yaspSetPortsAndReq();
+} // yaspxRQH
+
+function yaspxAKL()
+{
+  var laddr = regIR & 0x07;
+  var baddr = 0x01;
+
+  yaspGetPortsAndAck();
+  while( laddr > 0 ) {
+    laddr = laddr -1;
+    baddr <<= 1;
+  } // while
+  if( (baddr & regACK) != 0 ) {             // if ACK[laddr] != 0 then
+    regPC = regPC - 1;                      //   PC <-- <PC> - 1
+  } // if                                   // endif
+  yaspUpdatePC();
+} // yaspxAKL
+
+function yaspxAKH()
+{
+  var laddr = regIR & 0x07;
+  var baddr = 0x01;
+
+  yaspGetPortsAndAck();
+  while( laddr > 0 ) {
+    laddr = laddr -1;
+    baddr <<= 1;
+  } // while
+  if( (baddr & regACK) == 0 ) {             // if ACK[laddr] == 0 then
+    regPC = regPC - 1;                      //   PC <-- <PC> - 1
+  } // if                                   // endif
+  yaspUpdatePC();
+} // yaspxAKH
+
+function yaspxROL()
+{
+  var MSB = regA & 0x80;                    // Cy, A <-- ROL( <A> )
+
+  if( MSB != 0 ) {
+    regA <<= 1;
+    regA |= 0x01;
+    flagCarry = true;
+  } else {
+    regA <<= 1;
+    flagCarry = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateCarry();
+} // yaspxROL
+
+function yaspxROR()
+{
+  var LSB = regA & 0x01;                    // A, Cy <-- ROR( <A> )
+
+  if( LSB != 0 ) {
+    regA >>= 1;
+    regA |= 0x80;
+    flagCarry = true;
+  } else {
+    regA >>= 1;
+    flagCarry = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateCarry();
+} // yaspxROR
+
+function yaspxRCL()
+{
+  var MSB = regA & 0x80;                    // Cy, A <-- RCL( <Cy>, <A> )
+
+  regA <<= 1;
+  if( flagCarry ) {
+    regA |= 0x01;
+  } // if
+  if( MSB != 0 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxRCL
+
+function yaspxRCR()
+{
+  var LSB = regA & 0x01;                    // A, Cy <-- RCR( <A>, <Cy> )
+
+  regA >>= 1;
+  if( flagCarry ) {
+    regA |= 0x80;
+  } // if
+  if( LSB != 0 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxRCL
+
+function yaspxSHL()
+{
+  var MSB = regA & 0x80;                    // Cy, A <-- SHL( <A> )
+
+  regA <<= 1;
+  if( MSB != 0 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxSHL
+
+function yaspxSHR()
+{
+  var LSB = regA & 0x01;                    // A, Cy <-- SHR( <A> )
+
+  regA >>= 1;
+  if( LSB != 0 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxSHR
+
+function yaspxSCL()
+{
+  regA <<= 1;                               // A <-- SCL( <A>, <Cy> )
+  if( flagCarry ) {
+    regA |= 0x01;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxSCL
+
+function yaspxSCR()
+{
+  regA >>= 1;                               // A <-- SCR( <Cy>, <A> )
+  if( flagCarry ) {
+    regA |= 0x80;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxSCR
+
+function yaspxCLC()
+{
+  flagCarry = false;                        // Cy <-- 0
+  yaspUpdateCarry();
+} // yaspxCLC
+
+function yaspxSTC()
+{
+  flagCarry = true;                         // Cy <-- 1
+  yaspUpdateCarry();
+} // yaspxSTC
+
+function yaspxNOT()
+{
+  regA = ~regA;                             // A <-- NOT( <A> )
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxNOT
+
+function yaspxNEG()
+{
+  regA = ~regA +1;                          // A <-- NEG( <A> )
+  if( (regA & 0xFF) == 0 ) {
+    flagZero  = true;
+    flagCarry = false;
+  } else {
+    flagZero  = false;
+    flagCarry = true;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxNEG
+
+function yaspxINA()
+{
+  regA = regA + 1;                          // A <-- <A> + 1
+  if( regA > 255 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxINA
+
+function yaspxDCA()
+{
+  regA = regA - 1;                          // A <-- <A> - 1
+  if( regA < 0 ) {
+    flagCarry = true;
+    regA += 256;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regA & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxDCA
+
+function yaspxINX()
+{
+  regX = regX + 1;                          // X <-- <X> + 1
+  if( regX > 255 ) {
+    flagCarry = true;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regX & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateX();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxINX
+
+function yaspxDCX()
+{
+  regX = regX - 1;                          // X <-- <X> - 1
+  if( regX < 0 ) {
+    flagCarry = true;
+    regX += 256;
+  } else {
+    flagCarry = false;
+  } // if
+  if( (regX & 0xFF) == 0 ) {
+    flagZero = true;
+  } else {
+    flagZero = false;
+  } // if
+  yaspUpdateX();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxDCX
+
+function yaspxLDA()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+    yaspUpdateMB();
+  } // if
+  regA = regMB;                             // A <-- <MB>
+  yaspUpdateA();
+} // yaspxLDA
+
+function yaspxLDX()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+    yaspUpdateMB();
+  } // if
+  regX = regMB;                             // X <-- <MB>
+  yaspUpdateX();
+} // yaspxLDX
+
+function yaspxSTA()
+{
+  regMB  = regA;                            // MB <-- <A>
+  memory[regMAR].tagval.value = regMB;      // <MAR> <-- MB { write }
+  yaspUpdateMB();
+  yaspRedrawMem();
+} // yaspxSTA
+
+function yaspxTAX()
+{
+  regX = regA;                              // X <-- <A>
+  yaspUpdateX();
+} // yaspxTAX
+
+function yaspxSTX()
+{
+  regMB  = regX;                            // MB <-- <X>
+  memory[regMAR].tagval.value = regMB;      // <MAR> <-- MB { write }
+  yaspUpdateMB();
+  yaspRedrawMem();
+} // yaspxSTX
+
+function yaspxTXA()
+{
+  regA = regX;                              // A <-- <X>
+  yaspUpdateA();
+} // yaspxTXA
+
+function yaspxTST()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  flagZero = (regMB & regA & 0xFF) == 0;    // () <-- <A> and <MB>
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxTST
+
+function yaspxAND()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  regA = regMB & regA & 0xFF;               // A <-- <A> and <MB>
+  flagZero = regA == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxAND
+
+function yaspxXOR()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  regA = (regMB ^ regA) & 0xFF;             // A <-- <A> xor <MB>
+  flagZero = regA == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxXOR
+
+function yaspxOR()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  regA = (regMB | regA) & 0xFF;             // A <-- <A> or <MB>
+  flagZero = regA == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+} // yaspxOR
+
+function yaspxCMP()
+{
+  var busW;
+
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  busW = regA + 256 - regMB;                // () <-- <A> - <MB>
+  flagCarry = busW > 255;
+  flagZero = (busW&0xFF) == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxCMP
+
+function yaspxSUB()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  regA = regA + 256 - regMB;                // A <-- <A> - <MB>
+  flagCarry = regA > 255;
+  regA &= 0xFF;
+  flagZero = regA == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxSUB
+
+function yaspxADD()
+{
+  if( (regIR&0x03) != IMMEDIATE ) {
+    regMB  = memory[regMAR].tagval.value;   // MB <-- <<MAR>> { read }
+  } // if
+  regA = regA + regMB;                      // A <-- <A> + <MB>
+  flagCarry = regA > 255;
+  regA &= 0xFF;
+  flagZero = regA == 0;
+  yaspUpdateA();
+  yaspUpdateZero();
+  yaspUpdateCarry();
+} // yaspxADD
+
+function yaspxJMP()
+{
+  regPC = regMB;                            // PC <-- <MB>
+  yaspUpdatePC();
+} // yaspxJMP
+
+function yaspxHLT()
+{
+  regPC = regPC -1;                         // PC <-- <PC> - 1
+  yaspUpdatePC();
+} // yaspxHLT
+
+function yaspExec()
+{
+  eval( "yaspx"+Mnemonic[regIR].split(' ')[0]+"();" );
+} // yaspExec
+
+function yaspStep()
+// All instructions require fetch, decode and execute phases,
+// but those which have a second byte, which require up to 6 extra clock ticks.
+{
+  if( memory[regPC].bp && yaspIsRunning != null ) {
+    yaspStop();
+  } else {
+    yaspFetch();
+    if( (regIR&0xF0) > 0xC0 ) { // decoding: need extra cycles for addressing ?
+      switch( regIR&0xFF ) {
+        case 0xDB: yaspxTAX(); break;
+        case 0xDF: yaspxTXA(); break;
+        case 0xFF: yaspxHLT(); break;
+        case 0xD8: 
+        case 0xD9: 
+        case 0xDA: yaspLdAddr(); yaspxSTA(); break;
+        case 0xDC:
+        case 0xDD:
+        case 0xDE: yaspLdAddr(); yaspxSTX(); break;
+        case 0xFC: 
+        case 0xFD: 
+        case 0xFE: yaspLdAddr(); yaspxJMP();  break;
+        default:   yaspLdAddr(); yaspExec();
+      } // switch
+    } else {
+      yaspExec();
+    } // if
+  } // if
+} // yaspStep
+
+function yaspToggleBP( pos )
+{
+	var cellid = "b"+pos;
+	if( memory[pos].bp ) { // clear breakpoint
+		memory[pos].bp = false;
+		window.memframe.document.getElementById(cellid).style.backgroundColor="#FFFFFF";
+	}	else { // set breakpoint
+		memory[pos].bp = true;
+		window.memframe.document.getElementById(cellid).style.backgroundColor="#FF0000";
+	}	// if 
+} // yaspToggleBP
+
+function yaspNewA()
+{
+  var line = prompt( "Input new value for register A" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regA = tv.value;
+    } // if
+  } // if
+  yaspUpdateA();
+} // yaspNewA
+
+function yaspNewX()
+{
+  var line = prompt( "Input new value for register X" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regX = tv.value;
+    } // if
+  } // if
+  yaspUpdateX();
+} // yaspNewX
+
+function yaspNewPC()
+{
+  var line = prompt( "Input new value for register PC" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regPC = tv.value;
+    } // if
+  } // if
+  yaspUpdatePC();
+} // yaspNewPC
+
+function yaspNewMB()
+{
+  var line = prompt( "Input new value for memory buffer" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regMB = tv.value;
+    } // if
+  } // if
+  yaspUpdateMB();
+} // yaspNewMB
+
+function yaspNewMAR()
+{
+  var line = prompt( "Input new value for memory address register" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regMAR = tv.value;
+    } // if
+  } // if
+  yaspUpdateMAR();
+} // yaspNewMAR
+
+function yaspNewIR()
+{
+  var line = prompt( "Input new value for instruction register" );
+  var tv;
+
+  if( line != null ) {
+    line = line.split(';')[0];
+    line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  } else {
+    line = "";
+  } // if
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Register unchanged." );
+    } else {
+      regIR = tv.value;
+    } // if
+  } // if
+  yaspUpdateIR();
+} // yaspNewIR
+
+var yaspChannelEnd = "none";
+
+function yaspNewPort( num )
+{
+  var line = "0";
+  var tv;
+
+  if( yaspChannelEnd != "none" ) {
+    yaspGetPortsAndAck();
+    line = " " + (num<8? portINP[num] : portIO[num-8]);
+  } else {
+    line = prompt( "Input new value for port number " + num, "" );
+  } // if
+  line = line.split(';')[0];
+  line = line.replace(/^\s+|\s+$/g,'').replace(/\s+/g,' '); // removes extra spaces
+  if( line.length > 0 ) {
+    tv = new taggedValue( line );
+    if(  tv.tag == UNKWN || tv.tag == UADDR ) {
+      alert( "Could not determine value from input: Port register unchanged." );
+    } else {
+      if( num < 8 ) {
+        portINP[num] = tv.value;
+      } else {
+        portIO[num-8] = tv.value;
+      } // if
+    } // if
+  } // if
+  yaspUpdateINP( num );
+} // yaspNewPort
+
+function yaspToggleCarry()
+{
+  if( flagCarry == 0 ) { flagCarry = 1; } else { flagCarry = 0; }
+  yaspUpdateCarry();
+} // yaspToggleCarry
+
+function yaspToggleZero()
+{
+  if( flagZero == 0 ) { flagZero = 1; } else { flagZero = 0; }
+  yaspUpdateZero();
+} // yaspToggleZero
+
+function yaspClickACK( cBox )
+{
+  if( yaspChannelEnd == "none" ) {
+    if( cBox.checked ) {
+      regACK += parseInt(cBox.value);
+    } else {
+      regACK -= parseInt(cBox.value);
+    } // if
+  } else {
+    cBox.checked = !cBox.checked;
+  } // if 
+} // yaspClickACK
+
+function yaspClickREQ( cBox )
+{
+  var reql = document.form1;
+
+  cBox.checked = regREQ&cBox.value;
+
+  regREQ  = parseInt( reql.req0.checked? reql.req0.value : 0 );
+  regREQ += parseInt( reql.req1.checked? reql.req1.value : 0 );
+  regREQ += parseInt( reql.req2.checked? reql.req2.value : 0 );
+  regREQ += parseInt( reql.req3.checked? reql.req3.value : 0 );
+  regREQ += parseInt( reql.req4.checked? reql.req4.value : 0 );
+  regREQ += parseInt( reql.req5.checked? reql.req5.value : 0 );
+  regREQ += parseInt( reql.req6.checked? reql.req6.value : 0 );
+  regREQ += parseInt( reql.req7.checked? reql.req7.value : 0 );
+} // yaspClickREQ
+
+/////////////////////////
+// GUI Functions
+///////////
+
+var yaspIsRunning =  null;
+ 
+function yaspStop()
+{
+  var b = document.getElementById( "bPlayPause" );
+
+  b.value = "Run";
+  if( yaspIsRunning != null ) window.clearInterval( yaspIsRunning );
+} // yaspStop
+
+function yaspRun()
+{
+  var b = document.getElementById( "bPlayPause" );
+
+  b.value = "Stop";
+  yaspIsRunning =  window.setInterval( 'yaspStep()', 300 );
+} // _grPlay
+
+function yaspPlayPause()
+{
+  var b = document.getElementById( "bPlayPause" );
+  if( b.value == "Run" ) {
+    yaspRun();
+  } else {
+    yaspStop();
+  } // if 
+} // yaspPlayPause
+
+function yaspBind()
+{
+  var bound = true;
+  var cookieVal = "none";
+
+  if( yaspChannelEnd == cookieVal ) {
+    cookieVal = getCookie( "yaspA" );
+    if( !cookieVal || (cookieVal == "none") ) {
+      yaspChannelEnd = "yaspA";
+      setCookie( yaspChannelEnd, "FFFFFFFFFFFFFFFFXXXXXXXXXXXXXXXX00" );
+      alert( "YASP bound to end 'A'" );
+    } else {
+      cookieVal = getCookie( "yaspB" );
+      if( !cookieVal || (cookieVal == "none") ) {
+        yaspChannelEnd = "yaspB";
+        setCookie( yaspChannelEnd, "FFFFFFFFFFFFFFFFXXXXXXXXXXXXXXXX00" );
+        alert( "YASP bound to end 'B'" );
+      } else {
+        alert( "Comm. channel ends already bound!" );
+        yaspChannelEnd = "none";
+        bound = false;
+      } // if
+    } // if
+  } else {
+    alert( "Already bound!" );
+    bound = false;
+  } // if 
+  return bound;
+}  // yaspBind
+
+function yaspUnBind()
+{
+  var bound = true;
+  if( yaspChannelEnd != "none"  ) {
+    delCookie( yaspChannelEnd );
+    yaspChannelEnd = "none";
+  } else {
+    alert( "Not yet bound!" );
+    bound = false;
+  } // if 
+  return bound;
+}  // yaspUnbind
+
+function yaspBindSwitch( b )
+{
+  if( b.value == "Bind" ) {
+    if( yaspBind() ) b.value = "Unbind";
+  } else {
+    if( yaspUnBind() ) b.value = "Bind";
+  }  // if 
+} // yaspBindSwitch
+
+function yaspReset()
+{
+  yaspStop();
+  regPC = 0;
+  yaspUpdatePC();
+  regPCpre = 0;
+  window.memframe.scrollTo(0, 0);
+  yaspHighlightRows();
+} // yaspReset
+
+function openHelpWindow()
+{
+  HelpWindow = window.open( "jsYASPfolder/help.htm", "help_window",
+    "height=100, width=400, toolbar=no, menubar=no, scrollbars=yes, resizable=yes, location=no, directories=no, status=no"
+  );
+} // openHelpWindow
+
+function yaspInitIDE()
+{
+  var ta = document.getElementById('source');
+	var dsrc = "; Hello, world!\nLDA #'H'\nOUT 7\nLDA #'i'\nOUT 6\nLDA #'!'\nOUT 5\nHLT";
+
+	ta.value = dsrc;
+  yaspSetSymbols();
+  yaspCreateMemWindow();
+  yaspAssemble();
+} // yaspInitIDE
+
+</SCRIPT>
+
+<STYLE type=text/css>BODY {
+	MARGIN-TOP: 5px
+}
+</STYLE>
+
+</HEAD>
+<BODY
+ onload = 'document.form1.reset(); yaspInitIDE();'
+ onUnLoad = 'if( yaspChannelEnd != "none" ) {
+                removeCookie( yaspChannelEnd )
+             }'
+>
+<TABLE cellSpacing=0 cellPadding=0 width=770 align=center border=0><TBODY>
+  <TR><TD><IMG height=50 src="jsYASPfolder/superior.gif" width=770></TD></TR>
+  <TR><TD><IMG height=10 src="jsYASPfolder/p.gif" width=1></TD></TR>
+  <TR><TD bgColor=#cccccc><IMG height=1 src="jsYASPfolder/p.gif" width=1></TD></TR>
+  <TR><TD>
+  <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+    <TR>
+      <TD width=1 bgColor=#cccccc><IMG height=1 src="jsYASPfolder/p.gif" width=1></TD>
+      <TD width="100%">
+        <FORM name=form1 action="" method=post>
+        <TABLE cellSpacing=0 cellPadding=0 width="95%" align=center border=0><TBODY>
+          <TR><TD class=texto><BR><SPAN class=textoBold>Code: </SPAN></TD></TR>
+          <TR><TD><TEXTAREA class=textInput name=source id=source rows=15 cols=142></TEXTAREA></TD></TR>
+          <TR><TD>
+            <INPUT class=FormButton onclick='yaspAssemble()' type=button size=10 value=" Assemble">
+            &nbsp;&nbsp;
+            <INPUT class=FormButton onclick="javascript:if(confirm('OK to clear source code?'))document.form1.reset()" type=button size=6 value=" Clear">
+            &nbsp;
+          </TD></TR>
+          <TR><TD><BR>
+            <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+              <TR class=texto>
+                <TD class=textoBold width=260>Memory:</TD>
+                <TD class=textoBold width=245>Registers:</TD>
+                <TD class=textoBold align=middle width=220>Communication ports:</TD></TR>
+              <TR>
+                <TD vAlign=top align=center width=260>
+							    <IFRAME id=memframe name=memframe width=245 scrolling=yes height=257>
+								</IFRAME></TD>
+                <TD vAlign=top width=245>
+                   <TABLE borderColor=#000000 cellSpacing=0 cellPadding=0 width=245 border=1><TBODY>
+                     <TR class=texto align=middle>
+                       <TD align=left width=46>
+                        <INPUT class=FormButton onclick="yaspNewA()" type=button size=3 value="  A  ">
+                       </TD>
+                       <TD id=rab width=65>00000000</TD>
+                       <TD id=rah width=24>00</TD>
+                       <TD id=rad width=40>0</TD>
+                       <TD id=ras width=32>+0</TD>
+                       <TD id=rac width=21>'.'</TD></TR>
+                     <TR class=texto align=middle>
+                       <TD align=left width=46><INPUT class=FormButton onclick="yaspNewX()" type=button size=3 value="  X  "></TD>
+                       <TD id=rxb width=65>00000000</TD>
+                       <TD id=rxh width=24>00</TD>
+                       <TD id=rxd width=40>0</TD>
+                       <TD id=rxs width=32>+0</TD>
+                       <TD id=rxc width=21>'.'</TD></TR>
+                     <TR align=middle>
+                       <TD align=left width=46><INPUT class=FormButton onclick="yaspNewMB()" type=button size=3 value=" MB "></TD>
+                       <TD class=texto id=mbb width=65>00000000</TD>
+                       <TD class=texto id=mbh width=24>00</TD>
+                       <TD class=texto id=mbd width=40>0</TD>
+                       <TD class=texto id=mbs width=32>+0</TD>
+                       <TD class=texto id=mbc width=21>'.'</TD></TR>
+                     <TR align=middle>
+                       <TD align=left width=46><INPUT class=FormButton onclick="yaspNewMAR()" type=button size=1 value=MAR></TD>
+                       <TD class=texto id=marb width=65>00000000</TD>
+                       <TD class=texto id=marh width=24>00</TD>
+                       <TD class=texto id=mard width=40>0</TD>
+                       <TD class=texto id=mars width=32>+0</TD>
+                       <TD class=texto id=marc width=21>'.'</TD></TR>
+                     <TR class=texto align=middle>
+                       <TD align=left width=46><INPUT class=FormButton onclick="yaspNewPC()" type=button size=3 value=" PC "></TD>
+                       <TD id=pcb width=65>00000000</TD>
+                       <TD id=pch width=24>00</TD>
+                       <TD id=pcd width=40>0</TD>
+                       <TD id=pcs width=32>+0</TD>
+                       <TD id=pcc width=21>'.'</TD></TR>
+                     <TR align=middle>
+                       <TD vAlign=top align=left width=46><INPUT class=FormButton onclick="yaspNewIR()" type=button size=3 value=" IR  "></TD>
+                       <TD class=texto width=65>
+                         <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+                           <TR><TD class=texto id=irbi align=middle>00000000</TD></TR>
+                           <TR><TD class=texto id=irbo align=middle>00000000</TD></TR>
+                         </TBODY></TABLE>
+                       </TD>
+                       <TD class=texto width=24>
+                         <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+                           <TR><TD class=texto id=irhi align=middle>00</TD></TR>
+                           <TR><TD class=texto id=irho align=middle>00</TD></TR>
+												 </TBODY></TABLE>
+                       </TD>
+                       <TD class=texto width=40>
+                         <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+                           <TR><TD class=texto id=irdi align=middle>JC</TD></TR>
+                           <TR><TD class=texto id=irdo align=middle>0</TD></TR>
+												 </TBODY></TABLE>
+                       </TD>
+                       <TD class=texto width=32>
+                         <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+                           <TR><TD class=texto id=irsi align=middle>+00</TD></TR>
+                           <TR><TD class=texto id=irso align=middle>+0</TD></TR>
+												 </TBODY></TABLE>
+                       </TD>
+                       <TD class=texto width=21>
+                         <TABLE cellSpacing=0 cellPadding=0 width="100%" border=0><TBODY>
+                           <TR><TD class=texto id=irci align=middle>'.'</TD></TR>
+                           <TR><TD class=texto id=irco align=middle>'.'</TD></TR>
+												 </TBODY></TABLE>
+											 </TD>
+										 </TR>
+									 </TBODY></TABLE>
+									 <BR><SPAN class=textoBold>Flags:</SPAN><BR>
+                   <TABLE borderColor=#000000 cellSpacing=0 cellPadding=0 width=150 border=1>
+                          <TBODY>
+                          <TR align=middle>
+                            <TD width=50><INPUT class=FormButton onclick=javascript:yaspToggleCarry() type=button size=5 value=" Carry"></TD>
+                            <TD class=texto id=carry width=26>0</TD>
+                            <TD class=texto width=47><INPUT class=FormButton onclick=javascript:yaspToggleZero() type=button size=5 value=" Zero"></TD>
+                            <TD class=texto id=zero width=27>0</TD>
+													</TR></TBODY>
+                   </TABLE>
+									 <BR><SPAN class=textoBold>Display:</SPAN><BR>
+                   <TABLE borderColor=#000000 cellSpacing=0 cellPadding=0 width=208 border=1>
+                          <TBODY>
+                          <TR class=texto align=middle>
+                            <TD width=26>7</TD>
+                            <TD width=26>6</TD>
+                            <TD width=26>5</TD>
+                            <TD width=26>4</TD>
+                            <TD width=26>3</TD>
+                            <TD width=26>2</TD>
+                            <TD width=26>1</TD>
+                            <TD>0</TD></TR>
+                          <TR class=texto align=middle>
+                            <TD id=display7 width=26>&nbsp;</TD>
+                            <TD id=display6 width=26>&nbsp;</TD>
+                            <TD id=display5 width=26>&nbsp;</TD>
+                            <TD id=display4 width=26>&nbsp;</TD>
+                            <TD id=display3 width=26>&nbsp;</TD>
+                            <TD id=display2 width=26>&nbsp;</TD>
+                            <TD id=display1 width=26>&nbsp;</TD>
+                            <TD id=display0 width=26>&nbsp;</TD>
+						             </TR>
+										 </TBODY></TABLE>
+									 </TD>
+                   <TD vAlign=top align=right width=220>
+                        <TABLE class=texto borderColor=#000000 cellSpacing=0 
+                        cellPadding=0 width="85%" border=1>
+                          <TBODY>
+                          <TR align=middle>
+                            <TD width="17%">Nº</TD>
+                            <TD width="17%">INP</TD>
+                            <TD width="17%">OUT</TD>
+                            <TD width="17%">Nº</TD>
+                            <TD width="17%">I/0</TD></TR>
+                          <TR vAlign=center align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(0) height=18 
+                              src="jsYASPfolder/00.gif" width=17 border=0></TD>
+                            <TD id=prt0i width="17%">FF</TD>
+                            <TD id=prt0o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(8) height=18 
+                              src="jsYASPfolder/08.gif" width=20></TD>
+                            <TD id=prt8 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(1) height=18 
+                              src="jsYASPfolder/01.gif" width=17></TD>
+                            <TD id=prt1i width="17%">FF</TD>
+                            <TD id=prt1o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(9) height=18 
+                              src="jsYASPfolder/09.gif" width=20> </TD>
+                            <TD id=prt9 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(2) height=18 
+                              src="jsYASPfolder/02.gif" width=17></TD>
+                            <TD id=prt2i width="17%">FF</TD>
+                            <TD id=prt2o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(10) height=18 
+                              src="jsYASPfolder/10.gif" width=20></TD>
+                            <TD id=prt10 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(3) height=18 
+                              src="jsYASPfolder/03.gif" width=17></TD>
+                            <TD id=prt3i width="17%">FF</TD>
+                            <TD id=prt3o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(11) height=18 
+                              src="jsYASPfolder/11.gif" width=20></TD>
+                            <TD id=prt11 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(4) height=18 
+                              src="jsYASPfolder/04.gif" width=17></TD>
+                            <TD id=prt4i width="17%">FF</TD>
+                            <TD id=prt4o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(12) height=18 
+                              src="jsYASPfolder/12.gif" width=20></TD>
+                            <TD id=prt12 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(5) height=18 
+                              src="jsYASPfolder/05.gif" width=17></TD>
+                            <TD id=prt5i width="17%">FF</TD>
+                            <TD id=prt5o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(13) height=18 
+                              src="jsYASPfolder/13.gif" width=20></TD>
+                            <TD id=prt13 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(6) height=18 
+                              src="jsYASPfolder/06.gif" width=17></TD>
+                            <TD id=prt6i width="17%">FF</TD>
+                            <TD id=prt6o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(14) height=18 
+                              src="jsYASPfolder/14.gif" width=20></TD>
+                            <TD id=prt14 width="17%">FF</TD></TR>
+                          <TR align=middle>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(7) height=18 
+                              src="jsYASPfolder/07.gif" width=17> </TD>
+                            <TD id=prt7i width="17%">FF</TD>
+                            <TD id=prt7o width="17%">20</TD>
+                            <TD width="17%"><IMG 
+                              onclick=yaspNewPort(15) height=18 
+                              src="jsYASPfolder/15.gif" width=20></TD>
+                            <TD id=prt15 width="17%">FF</TD></TR></TBODY></TABLE><BR>
+                        <TABLE cellSpacing=1 cellPadding=0 width="85%" 
+                          border=0><TBODY>
+                          <TR class=texto align=left>
+                            <TD class=textoBold 
+                              colSpan=9>Acknowledgement/request:</TD></TR>
+                          <TR class=texto align=middle>
+                            <TD>&nbsp;</TD>
+                            <TD>7</TD>
+                            <TD>6</TD>
+                            <TD>5</TD>
+                            <TD>4</TD>
+                            <TD>3</TD>
+                            <TD>2</TD>
+                            <TD>1</TD>
+                            <TD>0</TD></TR>
+                          <TR class=texto align=middle>
+                            <TD>ACK=</TD>
+                            <TD><INPUT type=checkbox name=ack7 id=ack7 value=128 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack6 id=ack6 value= 64 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack5 id=ack5 value= 32 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack4 id=ack4 value= 16 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack3 id=ack3 value=  8 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack2 id=ack2 value=  4 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack1 id=ack1 value=  2 onClick='yaspClickACK( this )'></TD>
+                            <TD><INPUT type=checkbox name=ack0 id=ack0 value=  1 onClick='yaspClickACK( this )'></TD></TR>
+                          <TR class=texto align=middle>
+                            <TD>REQ=</TD>
+                            <TD><INPUT type=checkbox name=req7 id=req7 value=128 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req6 id=req6 value= 64 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req5 id=req5 value= 32 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req4 id=req4 value= 16 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req3 id=req3 value=  8 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req2 id=req2 value=  4 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req1 id=req1 value=  2 onClick='yaspClickREQ( this )'></TD>
+                            <TD><INPUT type=checkbox name=req0 id=req0 value=  1 onClick='yaspClickREQ( this )'></TD></TR>
+                          </TBODY></TABLE></TD></TR>
+                    <TR>
+                      <TD vAlign=center width=260>
+                               <INPUT class=FormButton onclick=javascript:yaspStep() type=button size=10 value="Step" name=button2>
+                        &nbsp; <INPUT class=FormButton onclick=javascript:yaspPlayPause() type=button size=10 value="Run" name=bPlayPause id=bPlayPause> 
+                        &nbsp; <INPUT class=FormButton onclick=javascript:yaspReset() type=button size=10 value="Reset" name=button23> 
+                        &nbsp; <INPUT class=FormButton onclick=javascript:yaspDump() type=button size=10 value="Dump" name=bDump></TD>
+                      <TD vAlign=center width=245>
+                        <INPUT class=FormButton onclick=javascript:window.close() type=button value=" Quit" name=button22> 
+                        &nbsp; <INPUT class=FormButton type=button name="bHelp" value="Help" OnClick='javascript:window.open("jsYASPfolder/help.htm")'>
+                        &nbsp; <INPUT class=FormButton type=button name="bAbout" value="About"
+                                OnClick='alert("jsYASP v2.110509 beta\n(C) 2004-2011 Lluís Ribas-Xirgo\nReleased under GNU License GPL.")'>
+                      </TD>
+                      <TD vAlign=center align=center class=textoBold width=220>
+                        Comm. channel: &nbsp;
+                        <INPUT class=FormButton type=button name="bSwitch" value="Bind" OnClick="yaspBindSwitch( this )">
+                      </TD>
+                    </TR>
+                    <TR>
+                      <TD vAlign=center width=260>&nbsp;</TD>
+                      <TD width=245>&nbsp;</TD>
+                      <TD width=220>&nbsp;</TD></TR></TBODY></TABLE>
+                  </TD></TR></TBODY></TABLE></FORM></TD>
+          <TD width=1 bgColor=#cccccc><IMG height=1 src="jsYASPfolder/p.gif" 
+            width=1></TD></TR></TBODY></TABLE></TD></TR>
+  <TR>
+    <TD bgColor=#cccccc><IMG height=1 src="jsYASPfolder/p.gif" 
+  width=1></TD></TR></TBODY></TABLE></BODY></HTML>
