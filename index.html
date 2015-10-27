@@ -19,14 +19,14 @@
 -->
 <!--
     Should you refer to this software, please, do use the following references:
-	[Rib10b] Lluís Ribas-Xirgo. "Yet Another Simple Processor (YASP) for
+	[Rib10b] LluÃ­s Ribas-Xirgo. "Yet Another Simple Processor (YASP) for
              Introductory Courses on Computer Architecture",
              in 'Ind. Electronics., Trans. on,' Vol. 57, pp. 3317 - 3323. Oct. 2010. 
-    [Rib10a] Lluís Ribas-Xirgo. "YASP: Educational processor's IDE." in yasptoolkit.sourceforge.net,
+    [Rib10a] LluÃ­s Ribas-Xirgo. "YASP: Educational processor's IDE." in yasptoolkit.sourceforge.net,
              since Jan. 2010.
-	[RR05]   David Rodríguez-Jurado, Lluís Ribas-Xirgo.
+	[RR05]   David RodrÃ­guez-Jurado, LluÃ­s Ribas-Xirgo.
              "jsYASP: Un simulador de un procesador educativo en Javascript" (in Spanish),
-             in 'Actas de las Jornadas de la ENseñanza Universitaria de la Informática (JENUI).'
+             in 'Actas de las Jornadas de la ENseÃ±anza Universitaria de la InformÃ¡tica (JENUI).'
              Jul. 2005.
 -->
 
@@ -155,7 +155,7 @@ taggedValue.prototype.toString = function( ftag )
                          + retstr; // prepends padding spaces
                   break;
     case ASC:     if( this.value < 0x20 || this.value > 0x79 ) {
-                    retstr = "'·'"; // non-printable ASCII character
+                    retstr = "'Â·'"; // non-printable ASCII character
                   } else {
                     retstr = "'" + String.fromCharCode(this.value) + "'";
                   } // if
@@ -2155,7 +2155,7 @@ function yaspInitIDE()
              }'
 >
 
-<a href="https://surtich.github.io/jsYASP/">Doc</a>
+<a href="https://surtich.github.io/jsYASP/jsYASPfolder/help.htm">Doc</a>
 
 <TABLE cellSpacing=0 cellPadding=0 width=770 align=center border=0><TBODY>
   <TR><TD><IMG height=50 src="jsYASPfolder/superior.gif" width=770></TD></TR>
@@ -2298,10 +2298,10 @@ function yaspInitIDE()
                         cellPadding=0 width="85%" border=1>
                           <TBODY>
                           <TR align=middle>
-                            <TD width="17%">Nº</TD>
+                            <TD width="17%">NÂº</TD>
                             <TD width="17%">INP</TD>
                             <TD width="17%">OUT</TD>
-                            <TD width="17%">Nº</TD>
+                            <TD width="17%">NÂº</TD>
                             <TD width="17%">I/0</TD></TR>
                           <TR vAlign=center align=middle>
                             <TD width="17%"><IMG 
@@ -2429,7 +2429,7 @@ function yaspInitIDE()
                         <INPUT class=FormButton onclick=javascript:window.close() type=button value=" Quit" name=button22> 
                         &nbsp; <INPUT class=FormButton type=button name="bHelp" value="Help" OnClick='javascript:window.open("jsYASPfolder/help.htm")'>
                         &nbsp; <INPUT class=FormButton type=button name="bAbout" value="About"
-                                OnClick='alert("jsYASP v2.110509 beta\n(C) 2004-2011 Lluís Ribas-Xirgo\nReleased under GNU License GPL.")'>
+                                OnClick='alert("jsYASP v2.110509 beta\n(C) 2004-2011 LluÃ­s Ribas-Xirgo\nReleased under GNU License GPL.")'>
                       </TD>
                       <TD vAlign=center align=center class=textoBold width=220>
                         Comm. channel: &nbsp;
